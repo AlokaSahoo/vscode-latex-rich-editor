@@ -1,0 +1,95 @@
+{
+  "name": "latex-rich-editor",
+  "displayName": "LaTeX Rich Editor",
+  "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile and PDF preview.",
+  "version": "0.0.1",
+  "license": "AGPL-3.0-or-later",
+  "publisher": "alokasahoo",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "latexRich.richEditor",
+        "displayName": "LaTeX Rich Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.tex"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "latexRich.toggleSourceView",
+        "title": "LaTeX Rich Editor: Toggle Rich/Source View"
+      },
+      {
+        "command": "latexRich.compile",
+        "title": "LaTeX Rich Editor: Compile",
+        "icon": "$(play)"
+      },
+      {
+        "command": "latexRich.showPreview",
+        "title": "LaTeX Rich Editor: Show PDF Preview",
+        "icon": "$(preview)"
+      }
+    ],
+    "configuration": {
+      "title": "LaTeX Rich Editor",
+      "properties": {
+        "latexRich.customCommands": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Style unrecognized LaTeX commands (e.g. REVTeX's `\\affiliation`, `\\eqref`, or your own macros) in the rich-text view. Map a command name (no backslash) to one of: `bold`, `italic`, `underline`, `reference`, `hidden`. Example: `{ \"eqref\": \"reference\", \"affiliation\": \"bold\" }`. Applies the next time a file is opened in the rich editor.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["bold", "italic", "underline", "reference", "hidden"]
+          }
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "latexRich.compile",
+          "when": "resourceExtname == .tex",
+          "group": "navigation@1"
+        },
+        {
+          "command": "latexRich.showPreview",
+          "when": "resourceExtname == .tex",
+          "group": "navigation@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "postinstall": "patch-package",
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "vscode:prepublish": "node esbuild.js --production"
+  },
+  "dependencies": {
+    "codemirror": "^6.0.1",
+    "codemirror-lang-latex": "^0.6.1",
+    "codemirror-visual-markup": "github:TeXlyre/codemirror-visual-markup",
+    "mathlive": "^0.107.0",
+    "pdfjs-dist": "^4.7.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.23.0",
+    "patch-package": "^8.0.1",
+    "typescript": "^5.5.0"
+  }
+}

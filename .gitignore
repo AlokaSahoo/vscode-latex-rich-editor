@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.vsix
+*.log
+.DS_Store
+sample/*.pdf
+sample/*.aux
+sample/*.fdb_latexmk
+sample/*.fls
+sample/*.synctex.gz

@@ -1,0 +1,19 @@
+diff --git a/node_modules/codemirror-visual-markup/dist/index.js b/node_modules/codemirror-visual-markup/dist/index.js
+index 564e918..993fc4d 100644
+--- a/node_modules/codemirror-visual-markup/dist/index.js
++++ b/node_modules/codemirror-visual-markup/dist/index.js
+@@ -137,12 +137,12 @@ function matchFenced(source, pos, open, close) {
+         return null;
+     let cursor = pos + open.length;
+     while (cursor < source.length) {
++        if (source.startsWith(close, cursor))
++            return { from: pos, to: cursor + close.length };
+         if (source[cursor] === '\\') {
+             cursor += 2;
+             continue;
+         }
+-        if (source.startsWith(close, cursor))
+-            return { from: pos, to: cursor + close.length };
+         cursor++;
+     }
+     return null;

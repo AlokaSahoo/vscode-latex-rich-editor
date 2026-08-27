@@ -1,0 +1,38 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+\title{Sample Document}
+\author{Aloka Sahoo}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This is a short abstract describing the paper's contribution.
+\end{abstract}
+
+\section{Introduction}
+This is a \textbf{bold} statements and this is \textit{italic}. Here is an inline
+equation $E=mc^2$ and a display equation:
+\begin{equation}
+  \int_0^\infty e^{-x^2} \, dx = \frac{\sqrt{\pi}}{2}
+  \label{eq:gaussian}
+\end{equation}
+
+As shown in Equation~\eqref{eq:gaussian} and Figure~\ref{fig:plot}.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.5\textwidth]{figures/plot.png}
+  \caption{A test gradient image.}
+  \label{fig:plot}
+\end{figure}
+
+\subsection{A list}
+\begin{itemize}
+  \item First item 1
+  \item Second item
+\end{itemize}
+
+\end{document}
