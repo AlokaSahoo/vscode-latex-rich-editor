@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
+      - run: npm test
       - run: npx vsce package --out latex-rich-editor-${{ github.ref_name }}.vsix
       - uses: softprops/action-gh-release@v2
         with:

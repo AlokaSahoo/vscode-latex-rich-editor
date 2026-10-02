@@ -2,7 +2,7 @@
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
   "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
   "icon": "images/icon.png",
@@ -95,7 +95,7 @@
       {
         "command": "latexRich.newPaper",
         "category": "LaTeX",
-        "title": "New REVTeX Paper\u2026"
+        "title": "New REVTeX Paper…"
       },
       {
         "command": "latexRich.checkSetup",
@@ -209,7 +209,7 @@
             "lualatex"
           ],
           "default": "auto",
-          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = \u2026` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
+          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = …` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
         },
         "latexRich.syncAfterCompile": {
           "type": "boolean",
@@ -225,7 +225,7 @@
             "off"
           ],
           "enumDescriptions": [
-            "Every REVTeX document (Letters in PRL, PRB, PRA, PRX\u2026 share the 3750-word limit)",
+            "Every REVTeX document (Letters in PRL, PRB, PRA, PRX… share the 3750-word limit)",
             "Only REVTeX documents with the prl option",
             "Every LaTeX document",
             "Never show it"
@@ -328,13 +328,16 @@
     "postinstall": "patch-package",
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "vscode:prepublish": "node esbuild.js --production"
+    "vscode:prepublish": "node esbuild.js --production",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p .",
+    "harness": "python3 -m http.server 8765"
   },
   "dependencies": {
     "@vscode/codicons": "^0.0.45",
     "codemirror": "^6.0.1",
     "codemirror-lang-latex": "^0.6.1",
-    "codemirror-visual-markup": "github:TeXlyre/codemirror-visual-markup",
+    "codemirror-visual-markup": "github:TeXlyre/codemirror-visual-markup#8a9f37ae1bb46bbcebdaf1602d396c5136e43005",
     "mathlive": "^0.107.0",
     "pdfjs-dist": "^4.7.76"
   },
@@ -344,6 +347,7 @@
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.23.0",
     "patch-package": "^8.0.1",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.9"
   }
 }

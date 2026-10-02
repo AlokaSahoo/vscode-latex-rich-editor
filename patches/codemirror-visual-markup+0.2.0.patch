@@ -1,5 +1,5 @@
 diff --git a/node_modules/codemirror-visual-markup/dist/index.js b/node_modules/codemirror-visual-markup/dist/index.js
-index 564e918..993fc4d 100644
+index 564e918..6d5b4a9 100644
 --- a/node_modules/codemirror-visual-markup/dist/index.js
 +++ b/node_modules/codemirror-visual-markup/dist/index.js
 @@ -137,12 +137,12 @@ function matchFenced(source, pos, open, close) {
@@ -17,3 +17,38 @@ index 564e918..993fc4d 100644
          cursor++;
      }
      return null;
+@@ -3347,6 +3347,15 @@ class MathWidget extends WidgetType {
+         this.close = token.meta?.close ?? '$';
+         this.syntax = context.language.id === 'typst' ? 'typst' : 'latex';
+         this.table = tablePresentation(token);
++        // Multi-row environments only render inside aligned/gathered.
++        const env = token.name;
++        if (this.display && env && this.syntax === 'latex') {
++            const inner = this.content.replace(/^\s*\{\d+\}/, '');
++            if (/^(align|flalign|alignat|eqnarray)\*?$/.test(env))
++                this.content = `\\begin{aligned}${inner}\\end{aligned}`;
++            else if (/^(gather|multline)\*?$/.test(env))
++                this.content = `\\begin{gathered}${inner}\\end{gathered}`;
++        }
+     }
+     eq(other) {
+         return (other instanceof MathWidget &&
+@@ -3360,6 +3369,9 @@ class MathWidget extends WidgetType {
+         applyTablePresentation(container, this.table);
+         const field = () => container.firstElementChild;
+         const commit = () => {
++            // Display math is edited as source; its field is a preview only.
++            if (this.display)
++                return;
+             const element = field();
+             if (!element || element.value === undefined)
+                 return;
+@@ -3370,6 +3382,8 @@ class MathWidget extends WidgetType {
+             replaceRange(view, container, this.text, `${this.open}${content}${this.close}`);
+         };
+         container.addEventListener('click', event => {
++            if (this.display)
++                return;
+             const element = field();
+             if (!element || element.value === undefined)
+                 return;

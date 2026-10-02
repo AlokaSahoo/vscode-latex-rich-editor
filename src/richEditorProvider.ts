@@ -13,6 +13,7 @@ import type {
   PageAlign,
   ProjectData,
   TextChange,
+  ViewPosition,
   WebviewToHostMessage,
 } from "./webview-editor/protocol";
 
@@ -40,11 +41,25 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
 
   private static readonly panels = new Map<string, OpenPanel>();
   private static readonly pendingReveals = new Map<string, number>();
-  private static readonly cursors = new Map<string, number>();
+  private static readonly pendingViews = new Map<string, ViewPosition>();
+  private static readonly positions = new Map<string, ViewPosition>();
 
   /** 0-based line of the cursor in an open rich view (for forward search). */
   public static cursorLine(uri: vscode.Uri): number | undefined {
-    return RichEditorProvider.cursors.get(uri.toString());
+    return RichEditorProvider.positions.get(uri.toString())?.line;
+  }
+
+  /** Cursor and scroll position last reported by a rich view, for opening the raw editor at the same spot. */
+  public static viewPosition(uri: vscode.Uri): ViewPosition | undefined {
+    return RichEditorProvider.positions.get(uri.toString());
+  }
+
+  /** Opens the rich view at a cursor/scroll position, now if it's open or as soon as it is. */
+  public static restoreView(uri: vscode.Uri, position: ViewPosition): void {
+    const key = uri.toString();
+    const open = RichEditorProvider.panels.get(key);
+    if (open?.ready) open.post({ type: "restoreView", position });
+    else RichEditorProvider.pendingViews.set(key, position);
   }
 
   /** Pushes the current page width/alignment settings to every open rich view. */
@@ -218,6 +233,11 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
           });
           entry.ready = true;
           RichEditorProvider.refreshDiagnostics(document.uri);
+          const pendingView = RichEditorProvider.pendingViews.get(key);
+          if (pendingView) {
+            RichEditorProvider.pendingViews.delete(key);
+            post({ type: "restoreView", position: pendingView });
+          }
           const pending = RichEditorProvider.pendingReveals.get(key);
           if (pending !== undefined) {
             RichEditorProvider.pendingReveals.delete(key);
@@ -271,7 +291,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
           await updateLayout(message.pageWidth, message.pageAlign);
           break;
         case "cursor":
-          RichEditorProvider.cursors.set(key, message.line);
+          RichEditorProvider.positions.set(key, message.position);
           break;
         case "addFigures": {
           try {

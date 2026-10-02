@@ -6,7 +6,8 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { type Extension, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
+import { type EditorState, type Extension, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
+import { MathfieldElement } from "mathlive";
 import { getLanguage, setVisualState, type Token, type TokenStyle } from "codemirror-visual-markup";
 import {
   CITE_COMMANDS,
@@ -17,7 +18,7 @@ import {
   MATH_ENVIRONMENTS,
 } from "../shared/latexText";
 import { collectDefinedColors, colorFromModel, type ColorTable, resolveColor, toCss } from "./colors";
-import type { CustomCommandStyle, ReferenceTable } from "./protocol";
+import type { CustomCommandStyle, ReferenceTable, ViewPosition } from "./protocol";
 
 // --- Document model -------------------------------------------------------
 
@@ -790,6 +791,37 @@ export function revealLine(view: EditorView, zeroBasedLine: number) {
   setTimeout(() => view.dispatch({ effects: flashLine.of(null) }), 1500);
 }
 
+/** Clicking a rendered display equation drops the cursor into its source so the raw LaTeX shows. */
+export function revealEquationSource(view: EditorView, event: MouseEvent) {
+  const widget = (event.target as HTMLElement | null)?.closest<HTMLElement>(".cm-lv-math-display");
+  if (!widget || !view.dom.contains(widget)) return;
+  const from = view.posAtDOM(widget);
+  const to = Math.min(view.state.doc.length, from + 4000);
+  const head = /^\\begin\s*\{[^}]*\}\s*|^\\\[\s*|^\$\$\s*/.exec(view.state.doc.sliceString(from, to));
+  event.stopPropagation();
+  event.preventDefault();
+  view.dispatch({ selection: { anchor: from + (head?.[0].length ?? 0) } });
+  view.focus();
+}
+
+/** Puts the cursor and scroll position back where another view of the file had them. */
+export function restoreView(view: EditorView, position: ViewPosition) {
+  const doc = view.state.doc;
+  const clampLine = (zeroBased: number) => doc.line(Math.min(doc.lines, Math.max(1, zeroBased + 1)));
+  const cursorLine = clampLine(position.line);
+  const head = Math.min(cursorLine.to, cursorLine.from + position.character);
+  const top = clampLine(position.topLine).from;
+  view.dispatch({ selection: { anchor: head } });
+  // Heights settle as widgets render, so scroll again once they have.
+  const scroll = () => view.dispatch({ effects: EditorView.scrollIntoView(top, { y: "start" }) });
+  scroll();
+  requestAnimationFrame(() => {
+    scroll();
+    setTimeout(scroll, 150);
+  });
+  view.focus();
+}
+
 // --- MathLive macros -----------------------------------------------------
 
 // The renderer creates MathLive fields internally with no hook for options,
@@ -810,8 +842,74 @@ function syncMathMacros(root: HTMLElement) {
   }).observe(root, { childList: true, subtree: true });
 }
 
+// --- Live preview while editing an equation's LaTeX ---------------------------
+
+const ROWS_ALIGNED = /^(align|flalign|alignat|eqnarray)\*?$/;
+const ROWS_GATHERED = /^(gather|multline)\*?$/;
+
+class EquationPreviewWidget extends WidgetType {
+  constructor(private readonly latex: string) {
+    super();
+  }
+  eq(other: EquationPreviewWidget) {
+    return other.latex === this.latex;
+  }
+  toDOM() {
+    const wrap = document.createElement("div");
+    wrap.className = "lr-eq-preview";
+    const field = new MathfieldElement();
+    field.readOnly = true;
+    field.value = this.latex;
+    wrap.appendChild(field);
+    return wrap;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+/** The display equation whose source contains `head`, with LaTeX MathLive can render. */
+function equationAt(state: EditorState, head: number): { end: number; latex: string } | undefined {
+  const base = Math.max(0, head - 4000);
+  const window = maskComments(state.doc.sliceString(base, Math.min(state.doc.length, head + 4000)));
+  const at = head - base;
+  const clean = (body: string) => body.replace(/\\(?:label|tag)\s*\{[^}]*\}|\\nonumber|\\notag/g, "").trim();
+
+  for (const span of environments(window)) {
+    if (!MATH_ENVIRONMENTS.has(span.name) || at < span.begin || at > span.end) continue;
+    const body = clean(window.slice(span.bodyFrom, span.bodyTo));
+    const latex = ROWS_ALIGNED.test(span.name)
+      ? `\\begin{aligned}${body}\\end{aligned}`
+      : ROWS_GATHERED.test(span.name)
+        ? `\\begin{gathered}${body}\\end{gathered}`
+        : body;
+    return body ? { end: base + span.end, latex } : undefined;
+  }
+  for (const m of window.matchAll(/\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g)) {
+    const from = m.index!;
+    const to = from + m[0].length;
+    if (at >= from && at <= to) {
+      const body = clean(m[1] ?? m[2]);
+      return body ? { end: base + to, latex: body } : undefined;
+    }
+  }
+  return undefined;
+}
+
+const equationPreview = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, tr) {
+    if (!visualMode) return Decoration.none;
+    if (!tr.docChanged && !tr.selection && !tr.effects.some((e) => e.is(refresh))) return value;
+    const found = equationAt(tr.state, tr.state.selection.main.head);
+    if (!found) return Decoration.none;
+    return Decoration.set([Decoration.widget({ widget: new EquationPreviewWidget(found.latex), block: true, side: 1 }).range(found.end)]);
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 export function enhancementExtensions(): Extension[] {
-  return [documentInfoField, pageScale, colorScopes, referencePlugin, symbolPlugin, flashField];
+  return [documentInfoField, pageScale, colorScopes, referencePlugin, symbolPlugin, flashField, equationPreview];
 }
 
 export function attachEnhancementsToDom(root: HTMLElement) {

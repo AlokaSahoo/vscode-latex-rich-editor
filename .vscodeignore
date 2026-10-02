@@ -8,3 +8,5 @@ esbuild.js
 tsconfig.json
 *.map
 .gitignore
+test/**
+vitest.config.mts

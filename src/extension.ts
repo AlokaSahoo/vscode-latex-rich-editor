@@ -161,9 +161,32 @@ async function reopenTexFile(uri: unknown, viewType: string) {
   // Both views share one document; saving first means closing the old tab
   // can never prompt about unsaved changes.
   if (document.isDirty) await document.save();
+
+  // Remember where the user is so the other view opens at the same spot.
+  const wantRich = viewType === RichEditorProvider.viewType;
+  const raw = vscode.window.visibleTextEditors.find((e) => e.document === document);
+  const position = wantRich
+    ? raw && {
+        line: raw.selection.active.line,
+        character: raw.selection.active.character,
+        topLine: raw.visibleRanges[0]?.start.line ?? raw.selection.active.line,
+      }
+    : RichEditorProvider.viewPosition(document.uri);
+  if (wantRich && position) RichEditorProvider.restoreView(document.uri, position);
+
   await vscode.commands.executeCommand("vscode.openWith", document.uri, viewType, column);
 
-  const wantRich = viewType === RichEditorProvider.viewType;
+  if (!wantRich && position) {
+    const editor = vscode.window.visibleTextEditors.find((e) => e.document === document);
+    if (editor) {
+      const last = document.lineCount - 1;
+      const cursor = new vscode.Position(Math.min(position.line, last), position.character);
+      editor.selection = new vscode.Selection(cursor, cursor);
+      const top = new vscode.Position(Math.min(position.topLine, last), 0);
+      editor.revealRange(new vscode.Range(top, top), vscode.TextEditorRevealType.AtTop);
+    }
+  }
+
   const group = vscode.window.tabGroups.all.find((g) => g.viewColumn === column);
   const stale = group?.tabs.find((tab) =>
     wantRich

@@ -401,3 +401,22 @@ math-field::part(virtual-keyboard-toggle) {
   background: var(--vscode-inputOption-activeBackground, rgba(0, 120, 212, 0.18)) !important;
   color: var(--vscode-inputOption-activeForeground, inherit) !important;
 }
+
+/* Rendered preview shown under an equation while its LaTeX source is being edited */
+.lr-eq-preview {
+  padding: 6px 0 10px;
+  text-align: center;
+  opacity: 0.9;
+}
+.lr-eq-preview math-field {
+  display: inline-block;
+  font-size: 1.15em;
+  border: none;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* Display equations are previews; clicking one opens its LaTeX source instead. */
+.cm-lv-math-display math-field {
+  pointer-events: none;
+}

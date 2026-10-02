@@ -2,10 +2,12 @@
 
 Overleaf-style rich-text (WYSIWYM) editing for `.tex` files in VS Code, with compile, PDF preview and PDF→source jumping built in. The file on disk always stays plain LaTeX — the rich view is a decoration layer over a real `vscode.TextDocument`, so it's fully git-diffable and works alongside any other LaTeX tooling.
 
+![Editing a display equation: its LaTeX source with a live rendered preview underneath, other equations typeset](images/equation-source.jpg)
+
 ## Features
 
 - **Rich-text editing** — headings, bold/italic, lists, tables, colors and figures render inline as you type. Put the cursor in any element to edit its raw LaTeX; move away to see it typeset again (as in Overleaf's visual editor).
-- **Math** — inline (`$…$`, `\(…\)`) and display (`$$…$$`, `\[…\]`, `equation`/`align`/…) math renders as live equations via [MathLive](https://cortexjs.io/mathlive/). Your own `\newcommand`/`\DeclareMathOperator` macros are used when rendering, and common physics commands (`\ket`, `\bra`, `\braket`, `\expval`, `\abs`, `\norm`, `\dd`, `\vb`, `\bm`) work out of the box.
+- **Math** — inline (`$…$`, `\(…\)`) and display (`$$…$$`, `\[…\]`, `equation`/`align`/…) math renders as live equations via [MathLive](https://cortexjs.io/mathlive/). Inline math edits in place; **click a display equation to edit its LaTeX** (`\begin{equation}…\end{equation}` appears with a live rendered preview underneath, and the equation re-typesets when you move away). Your own `\newcommand`/`\DeclareMathOperator` macros are used when rendering, and common physics commands (`\ket`, `\bra`, `\braket`, `\expval`, `\abs`, `\norm`, `\dd`, `\vb`, `\bm`) work out of the box.
 - **Cross-references** — after a compile, `\ref`, `\eqref`, `\cref`/`\autoref`, `\pageref` and `\cite`/`\citep`/`\onlinecite` show the numbers the PDF shows ("Fig. 1", "(3)", "[2, 5]"), read from the `.aux` file. Click one to edit it; unresolved keys stay visible as keys.
 - **Colors** — `\textcolor`, `\colorbox`, `\fcolorbox` and `{\color{…} …}` scopes, with xcolor base colors, `dvipsnames` (ForestGreen, RoyalBlue, …), svgnames, mixes like `red!30!blue`, and your own `\definecolor`/`\colorlet` colors.
 - **Figures, sized like the paper** — `figure`, `figure*`, `subfigure` panels and `\subfloat` render in place, including **PDF figures** (and EPS via pdflatex's converted PDF). Widths follow `\linewidth`, `\columnwidth`, `\textwidth`, `scale=` and physical units, using the document class's real layout — e.g. in a two-column REVTeX `reprint`, a `\linewidth` figure is one column wide and a `figure*` spans the page. `\graphicspath` and extension-less file names are resolved like LaTeX does.
@@ -16,7 +18,7 @@ Overleaf-style rich-text (WYSIWYM) editing for `.tex` files in VS Code, with com
 - **Paste or drop images** — paste a screenshot or drop a PNG/PDF (hold <kbd>Shift</kbd> while dropping, as VS Code requires) and it's saved under `figures/` with a complete `figure` environment inserted, cursor in the caption. Images already inside the paper's folder are referenced in place, not copied.
 - **LaTeX sidebar** — a LaTeX icon in the Activity Bar (left edge) opens **Actions** (compile, PDF preview, word count, arXiv, clean, new paper, setup check — one click each) and the **Outline**: sections, figures, tables and equations with their labels; click to jump. The raw editor also gets the standard Outline view and breadcrumbs.
 - **Prepare arXiv Submission** — one command builds `<paper>-arxiv.zip`: sources with comments removed, only the figures actually used, the `.bbl` (arXiv doesn't run BibTeX) and any local `.cls`/`.sty`/`.bst`, with warnings for anything missing.
-- **PRL length check** — counts the way the [APS length guide](https://journals.aps.org/authors/length-guide) does: text, captions and footnotes, plus 16 words per displayed-equation row (32 if two-column), 150/aspect + 20 per figure (300/(0.5·aspect) + 40 for `figure*`, aspect read from the image file), and 13 + 6.5/line per table. Title, authors, abstract, acknowledgments and references are excluded. Every REVTeX paper shows a live count in the status bar (bottom right; red when over the limit — click it for the breakdown), counting the whole paper even when you're editing an `\\input` chapter.
+- **PRL length check** — counts the way the [APS length guide](https://journals.aps.org/authors/length-guide) does: text, captions and footnotes, plus 16 words per displayed-equation row (32 if two-column), 150/aspect + 20 per figure (300/(0.5·aspect) + 40 for `figure*`, aspect read from the image file), and 13 + 6.5/line per table. Title, authors, abstract, acknowledgments, references, appendices and end matter (everything from `\appendix`, the bibliography or an "End Matter"/"Supplemental Material" heading onward) are excluded. A `~` before the count means some figure sizes had to be guessed. Every REVTeX paper shows a live count in the status bar (bottom right; red when over the limit — click it for the breakdown), counting the whole paper even when you're editing an `\\input` chapter.
 - **New REVTeX Paper** — starts a PRL, PRB, PRX or single-column preprint with a starter `references.bib` and a `figures/` folder.
 - **Compile** with `latexmk`; errors appear as VS Code Problems at the offending line.
 - **PDF preview** beside the editor (moon button for dark pages), crisp on high-DPI screens, keeping its scroll position across recompiles. **Double-click the PDF** to jump to the matching source line — in the rich view or the raw editor, whichever you're using.
@@ -93,7 +95,7 @@ The buttons in the editor's title bar work like Markdown's preview buttons:
 "workbench.editorAssociations": { "*.tex": "default" }
 ```
 
-Switching between the rich and raw views saves the file first, so the swap never asks about unsaved changes.
+Switching between the rich and raw views saves the file first, so the swap never asks about unsaved changes, and opens the other view at the same cursor position and scroll location (the Source/Visual toggle inside the rich view does the same).
 
 **Clean Auxiliary Files** removes only `<document name>.<build extension>` files next to the `.tex` (`.aux`, `.log`, `.fls`, `.fdb_latexmk`, `.synctex.gz`, `.bbl`, `.blg`, `.out`, `.toc`, …) plus REVTeX's generated `…Notes.bib` — never your sources, bibliographies or the PDF. Double-click-to-source needs the `.synctex.gz`, so compile again after cleaning.
 
@@ -105,10 +107,10 @@ A TeX distribution with `latexmk` on your `PATH` (TeX Live, MacTeX or MiKTeX). R
 
 One `.vsix` file works on macOS, Windows and Linux — no Node or npm needed to install it.
 
-1. Download `latex-rich-editor-v0.1.6.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
+1. Download `latex-rich-editor-v0.2.0.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
 2. Install it, either:
    - **In VS Code:** Extensions view (`⌘⇧X` / `Ctrl+Shift+X`) → `…` menu at the top → **Install from VSIX…** → pick the file, or
-   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.6.vsix`
+   - **From a terminal:** `code --install-extension latex-rich-editor-v0.2.0.vsix`
 3. Reload VS Code. `.tex` files now open in the rich view.
 4. For compiling, install a TeX distribution with `latexmk`: [MacTeX](https://tug.org/mactex/) on macOS, [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/) on Windows, TeX Live on Linux (e.g. `sudo apt install texlive-full latexmk`).
 
@@ -146,17 +148,15 @@ Both apply the next time a file is opened in the rich view.
 
 ## Roadmap
 
-Ideas for making the rich view closer to the PDF, roughly in priority order:
+Done: forward and inverse search, incremental sync with shared undo, multi-file projects, engine and compile-on-save options, spell-check findings in the rich view, tests.
 
-1. **Forward search** — "Show in PDF" from the editor cursor (inverse search already works).
-2. **Jump from Problems/search results into the rich view** — VS Code can't move the cursor inside a webview editor yet, so this needs its own handling.
-3. **Incremental editing sync** — send changes instead of the whole document, for one shared undo history and speed on thesis-sized files.
-4. **Multi-file projects** — `% !TEX root`, `\input`/`\include`, compiling the main file from a chapter.
-5. **Live settings and theme** — apply setting and light/dark theme changes without reopening.
-6. **Tables** — `ruledtabular`/`booktabs` styling, `\multicolumn`, column alignment from the preamble.
-7. **Theorem-like environments** (`theorem`, `proof`, `definition`) and `\footnote` as hover popups.
-8. **Engine and options** — choose `pdflatex`/`xelatex`/`lualatex`, compile on save, an output directory.
-9. **Spell-check inside the rich view**, and tests plus CI.
+Ideas for making the rich view closer to the PDF:
+
+1. **Jump from Problems/search results into the rich view** — VS Code can't move the cursor inside a webview editor yet, so this needs its own handling.
+2. **Finer undo steps** — typing in the rich view reaches VS Code as one edit per change; VS Code's extension API offers no way to merge them.
+3. **Tables** — `ruledtabular`/`booktabs` styling, `\multicolumn`, column alignment from the preamble.
+4. **Theorem-like environments** (`theorem`, `proof`, `definition`) and `\footnote` as hover popups.
+5. **Macros with optional arguments** (`\newcommand{\x}[2][default]{…}`) — MathLive's macro table can't express them, so they currently show unrendered.
 
 ## Development
 
@@ -164,14 +164,18 @@ Ideas for making the rich view closer to the PDF, roughly in priority order:
 npm install       # also applies patches/ via postinstall (see below)
 npm run build     # one-off build
 npm run watch     # rebuild on change
+npm test          # unit tests (word count, LaTeX parsing helpers)
+npm run typecheck
 npx vsce package  # produce an installable .vsix
 ```
+
+`test/harness/` runs the built rich editor in a plain browser for checking webview behavior without launching VS Code (see its README).
 
 Press `F5` with this folder open to launch an Extension Development Host with `sample/` pre-opened — `sample/revtex-sample.tex` exercises colors, figures, subfigures, macros and references.
 
 ### Third-party library patch
 
-The rich-rendering engine is [`codemirror-visual-markup`](https://github.com/TeXlyre/codemirror-visual-markup), an experimental library. It shipped with a bug where display-math delimiters that start with a backslash (`\[…\]`, `\(…\)`) never matched, because its fence scanner treated the closing delimiter's own backslash as an escape and skipped past it. `patches/codemirror-visual-markup+0.2.0.patch` fixes this and is applied automatically by `npm install` via `patch-package`.
+The rich-rendering engine is [`codemirror-visual-markup`](https://github.com/TeXlyre/codemirror-visual-markup), an experimental library. The dependency is pinned to an exact commit, and `patches/codemirror-visual-markup+0.2.0.patch` (applied automatically by `npm install` via `patch-package`) makes two fixes: display-math delimiters that start with a backslash (`\[…\]`, `\(…\)`) never matched, because its fence scanner treated the closing delimiter's own backslash as an escape; and multi-row environments (`align`, `gather`, …) rendered without their `aligned`/`gathered` wrapper and were written back corrupted, so display equations are now previews only and are edited as source.
 
 ## License
 

@@ -30,13 +30,15 @@ import {
   attachEnhancementsToDom,
   configureEnhancements,
   enhancementExtensions,
+  restoreView,
+  revealEquationSource,
   revealLine,
   setReferences,
   setVisualMode,
 } from "./latexEnhancements";
 import { editingHelpers, setDefinitionHandler } from "./editingHelpers";
 import { errorExtensions, resolveFixes, setFixChannel, showErrors } from "./errors";
-import type { HostToWebviewMessage, ImageKind, TextChange, WebviewToHostMessage } from "./protocol";
+import type { HostToWebviewMessage, ImageKind, TextChange, ViewPosition, WebviewToHostMessage } from "./protocol";
 import { resolveFigures, setFigureUploader, setImageLoader, setProjectData, smartExtensions } from "./smartFeatures";
 
 declare function acquireVsCodeApi(): {
@@ -129,19 +131,30 @@ async function rasterizePdf(url: string): Promise<string | null> {
 // Send only what changed (in pre-change offsets), immediately, so the host
 // applies small edits instead of replacing the whole document.
 let cursorTimer: ReturnType<typeof setTimeout> | undefined;
+
+function currentPosition(target: EditorView): ViewPosition {
+  const head = target.state.selection.main.head;
+  const line = target.state.doc.lineAt(head);
+  const top = target.lineBlockAtHeight(target.scrollDOM.scrollTop);
+  return {
+    line: line.number - 1,
+    character: head - line.from,
+    topLine: target.state.doc.lineAt(Math.min(top.from, target.state.doc.length)).number - 1,
+  };
+}
+
+function reportPosition(target: EditorView) {
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => post({ type: "cursor", position: currentPosition(target) }), 200);
+}
+
 const updateListener = EditorView.updateListener.of((update) => {
   if (update.docChanged && !applyingRemoteUpdate) {
     const changes: TextChange[] = [];
     update.changes.iterChanges((from, to, _fromB, _toB, inserted) => changes.push({ from, to, text: inserted.toString() }));
     post({ type: "changes", changes, baseLength: update.startState.doc.length });
   }
-  if (update.selectionSet || update.docChanged) {
-    clearTimeout(cursorTimer);
-    cursorTimer = setTimeout(() => {
-      const line = update.state.doc.lineAt(update.state.selection.main.head).number - 1;
-      post({ type: "cursor", line });
-    }, 200);
-  }
+  if (update.selectionSet || update.docChanged) reportPosition(update.view);
 });
 
 
@@ -181,6 +194,8 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
     ],
   });
   view = new EditorView({ state });
+  // Keep the host's idea of the scroll position current for view switches.
+  view.scrollDOM.addEventListener("scroll", () => view && reportPosition(view), { passive: true });
   const container = document.getElementById("editor")!;
   attachEnhancementsToDom(container);
   const editor = new DualLatexEditor(container, view, {
@@ -192,6 +207,17 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
       setVisualMode(view, mode === "visual");
     },
   });
+  // Clicking a display equation edits its LaTeX (the \begin{equation} source)
+  // rather than a math-field, which is how a LaTeX user expects to work.
+  view.dom.addEventListener("click", (event) => revealEquationSource(view!, event), true);
+  // Source and Visual lay the same text out at different heights; keep the
+  // user at the same place across the switch.
+  const switchMode = editor.setMode.bind(editor);
+  editor.setMode = (mode) => {
+    const position = currentPosition(view!);
+    switchMode(mode);
+    restoreView(view!, position);
+  };
   modernizeToolbar(container);
   followThemeChanges(view, (dark) => editor.setTheme(dark ? "dark" : "light"));
 }
@@ -239,6 +265,9 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
       break;
     case "revealLine":
       if (view) revealLine(view, message.line);
+      break;
+    case "restoreView":
+      if (view) restoreView(view, message.position);
       break;
     case "references":
       setReferences(view, message.references);

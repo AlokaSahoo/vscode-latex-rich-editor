@@ -45,6 +45,7 @@ export function countLength(mainFile: string, mainText?: string, limit = LETTER_
   const begin = source.search(/\\begin\s*\{document\}/);
   const end = source.search(/\\end\s*\{document\}/);
   let body = source.slice(begin >= 0 ? begin + "\\begin{document}".length : 0, end >= 0 ? end : undefined);
+  body = body.slice(0, endOfMainText(body));
   const folders = ["", ...graphicsPaths(source)];
 
   const figures: FigureCount[] = [];
@@ -57,7 +58,8 @@ export function countLength(mainFile: string, mainText?: string, limit = LETTER_
   const cuts: Array<{ from: number; to: number }> = [];
   for (const span of spans) {
     const content = body.slice(span.bodyFrom, span.bodyTo);
-    const wide = span.name.endsWith("*") || insideWidetext(body, span.begin);
+    // Only a figure*/table* spans both columns; align* and friends just drop the numbering.
+    const wide = /^(figure|table)\*$/.test(span.name) || insideWidetext(body, span.begin);
     if (EXCLUDED_ENV.test(span.name)) {
       cuts.push({ from: span.begin, to: span.end });
     } else if (/^figure\*?$/.test(span.name)) {
@@ -95,6 +97,17 @@ export function countLength(mainFile: string, mainText?: string, limit = LETTER_
     textWords + captionWords + equations.words + figures.reduce((s, f) => s + f.words, 0) + tables.reduce((s, t) => s + t.words, 0),
   );
   return { textWords, captionWords, equations, figures, tables, total, limit };
+}
+
+/** Where the countable text stops: acknowledgments, bibliography, appendices and any end matter after them are not counted. */
+export function endOfMainText(body: string): number {
+  const stops = [
+    /\\appendix\b/,
+    /\\begin\s*\{(?:appendices|acknowledgments|acknowledgements|thebibliography|endmatter)\}/,
+    /\\(?:bibliography|printbibliography)\b/,
+    /\\(?:section|subsection)\*?\s*\{\s*(?:end matter|supplemental material|supplementary (?:material|information))\s*\}/i,
+  ];
+  return Math.min(body.length, ...stops.map((re) => body.search(re)).filter((i) => i >= 0));
 }
 
 function isCounted(name: string): boolean {

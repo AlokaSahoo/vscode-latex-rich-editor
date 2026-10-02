@@ -27,6 +27,15 @@ export interface EditorDiagnostic {
   source?: string;
 }
 
+/** Where the user is in a document, so the other view can open at the same spot. */
+export interface ViewPosition {
+  /** 0-based cursor line and column. */
+  line: number;
+  character: number;
+  /** 0-based first line visible at the top of the view. */
+  topLine: number;
+}
+
 export type PageAlign = "center" | "left";
 
 export interface FixOption {
@@ -59,6 +68,7 @@ export type HostToWebviewMessage =
   | { type: "imageResolved"; requestId: string; url: string | null; kind: ImageKind }
   | { type: "figuresAdded"; requestId: string; paths: string[]; error?: string }
   | { type: "revealLine"; line: number }
+  | { type: "restoreView"; position: ViewPosition }
   | { type: "layout"; pageWidth: number; pageAlign: PageAlign }
   | { type: "fixes"; requestId: string; fixes: FixOption[] };
 
@@ -67,7 +77,7 @@ export type WebviewToHostMessage =
   | { type: "changes"; changes: TextChange[]; baseLength: number }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "cursor"; line: number }
+  | { type: "cursor"; position: ViewPosition }
   | { type: "setLayout"; pageWidth?: number; pageAlign?: PageAlign }
   | { type: "goToDefinition"; kind: "label" | "cite" | "file"; key: string }
   | { type: "requestFixes"; requestId: string; from: number; to: number }

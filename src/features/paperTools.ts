@@ -43,8 +43,12 @@ export function registerPaperTools(context: vscode.ExtensionContext, output: vsc
         return;
       }
       const report = countLength(root, root === document.uri.fsPath ? document.getText() : undefined, wordLimit(document.uri));
-      status.text = `$(book) ${report.total.toLocaleString()} / ${report.limit.toLocaleString()} words`;
-      status.tooltip = "APS length estimate (text + captions + equations + figures + tables). Click for the breakdown.";
+      const estimated = report.figures.some((f) => f.estimated);
+      status.text = `$(book) ${estimated ? "~" : ""}${report.total.toLocaleString()} / ${report.limit.toLocaleString()} words`;
+      status.tooltip =
+        "APS length estimate: text + captions + equations + figures + tables. Title, authors, abstract, acknowledgments, references, appendices and end matter are not counted." +
+        (estimated ? " Some figure sizes are guessed because the image file couldn't be read." : "") +
+        " Click for the breakdown.";
       status.backgroundColor = report.total > report.limit ? new vscode.ThemeColor("statusBarItem.errorBackground") : undefined;
       status.show();
     }, 800);
@@ -135,7 +139,7 @@ async function showLengthReport(document: vscode.TextDocument, output: vscode.Ou
 function formatReport(file: string, r: LengthReport): string {
   const lines = [
     `APS length estimate for ${file} — limit ${r.limit} words (latexRich.wordLimit)`,
-    "(rules: journals.aps.org/authors/length-guide; title, authors, abstract, acknowledgments and references excluded)",
+    "(rules: journals.aps.org/authors/length-guide; title, authors, abstract, acknowledgments, references, appendices and end matter excluded)",
     "",
     `  Text                         ${r.textWords}`,
     `  Captions                     ${r.captionWords}`,
