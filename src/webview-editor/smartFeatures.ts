@@ -1,5 +1,5 @@
 import { autocompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
-import { EditorSelection, type Extension } from "@codemirror/state";
+import type { Extension } from "@codemirror/state";
 import { EditorView, hoverTooltip } from "@codemirror/view";
 import { latexCompletionSource } from "codemirror-lang-latex";
 import { resolveImagePath } from "codemirror-visual-markup";
@@ -253,37 +253,6 @@ const figureDrops = EditorView.domEventHandlers({
   },
 });
 
-// Typing $ ( [ { or ` with text selected surrounds it instead of replacing
-// it (like VS Code's editor): $x$, (x), [x], {x}, ``x''.
-const SURROUND: Record<string, [string, string]> = {
-  $: ["$", "$"],
-  "(": ["(", ")"],
-  "[": ["[", "]"],
-  "{": ["{", "}"],
-  "`": ["``", "''"],
-};
-
-const surroundSelection = EditorView.inputHandler.of((view, _from, _to, text) => {
-  const pair = SURROUND[text];
-  const ranges = view.state.selection.ranges;
-  if (!pair || ranges.every((r) => r.empty)) return false;
-  view.dispatch(
-    view.state.changeByRange((range) => {
-      if (range.empty) {
-        return { changes: { from: range.from, insert: text }, range: EditorSelection.cursor(range.from + text.length) };
-      }
-      return {
-        changes: [
-          { from: range.from, insert: pair[0] },
-          { from: range.to, insert: pair[1] },
-        ],
-        range: EditorSelection.range(range.from + pair[0].length, range.to + pair[0].length),
-      };
-    }),
-  );
-  return true;
-});
-
 // codemirror-lang-latex installs its completion with `override`, which hides
 // every other source; so latex() is created with enableAutocomplete: false
 // and both sources are registered together here instead.
@@ -292,6 +261,5 @@ export function smartExtensions(): Extension[] {
     autocompletion({ override: [referenceCompletions, latexCompletionSource(true)], activateOnTyping: true }),
     referenceHover,
     figureDrops,
-    surroundSelection,
   ];
 }

@@ -69,6 +69,7 @@ export type WebviewToHostMessage =
   | { type: "redo" }
   | { type: "cursor"; line: number }
   | { type: "setLayout"; pageWidth?: number; pageAlign?: PageAlign }
+  | { type: "goToDefinition"; kind: "label" | "cite" | "file"; key: string }
   | { type: "requestFixes"; requestId: string; from: number; to: number }
   | { type: "applyFix"; requestId: string; index: number }
   | { type: "resolveImage"; requestId: string; path: string }

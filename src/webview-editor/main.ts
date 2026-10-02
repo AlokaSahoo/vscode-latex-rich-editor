@@ -34,6 +34,7 @@ import {
   setReferences,
   setVisualMode,
 } from "./latexEnhancements";
+import { editingHelpers, setDefinitionHandler } from "./editingHelpers";
 import { errorExtensions, resolveFixes, setFixChannel, showErrors } from "./errors";
 import type { HostToWebviewMessage, ImageKind, TextChange, WebviewToHostMessage } from "./protocol";
 import { resolveFigures, setFigureUploader, setImageLoader, setProjectData, smartExtensions } from "./smartFeatures";
@@ -151,6 +152,7 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
   setProjectData(message.project);
   setImageLoader((resolvedPath, src) => resolver.resolve(resolvedPath, src));
   setFigureUploader((requestId, files, uris) => post({ type: "addFigures", requestId, files, uris }));
+  setDefinitionHandler((target) => post({ type: "goToDefinition", ...target }));
   setFixChannel(
     (requestId, from, to) => post({ type: "requestFixes", requestId, from, to }),
     (requestId, index) => post({ type: "applyFix", requestId, index }),
@@ -175,6 +177,7 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
       ...smartExtensions(),
       themeExtension(),
       errorExtensions(),
+      ...editingHelpers(),
     ],
   });
   view = new EditorView({ state });

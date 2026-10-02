@@ -65,3 +65,47 @@ export function bibUris(document: vscode.TextDocument): vscode.Uri[] {
   const folder = vscode.Uri.joinPath(document.uri, "..");
   return bibFiles(document.getText()).map((name) => vscode.Uri.joinPath(folder, name));
 }
+
+export type DefinitionKind = "label" | "cite" | "file";
+
+/** Where a \ref's label, a \cite's bibliography entry, or an \input'ed file is. */
+export async function findDefinition(
+  document: vscode.TextDocument,
+  kind: DefinitionKind,
+  key: string,
+): Promise<vscode.Location | undefined> {
+  const rootPath = document.uri.scheme === "file" ? findRootFile(document.uri.fsPath, document.getText()) : document.uri.fsPath;
+  const folder = vscode.Uri.joinPath(vscode.Uri.file(rootPath), "..");
+  const at = (uri: vscode.Uri, line: number) => new vscode.Location(uri, new vscode.Position(line, 0));
+
+  if (kind === "file") {
+    for (const name of [key, `${key}.tex`]) {
+      const uri = vscode.Uri.joinPath(folder, name);
+      if ((await readText(uri)) !== undefined) return at(uri, 0);
+    }
+    return undefined;
+  }
+  if (kind === "label") {
+    const label = (await projectLabels(document)).find((l) => l.key === key);
+    return label && at(label.uri, label.line);
+  }
+  // Citation: a \bibitem in one of the .tex files, else the entry in a .bib file.
+  const files = await projectFiles(document);
+  for (const file of files) {
+    const index = file.text.search(new RegExp(`\\\\bibitem\\s*(\\[[^\\]]*\\])?\\s*\\{${escapeRegExp(key)}\\}`));
+    if (index >= 0) return at(file.uri, file.text.slice(0, index).split("\n").length - 1);
+  }
+  for (const file of files) {
+    for (const name of bibFiles(file.text)) {
+      const uri = vscode.Uri.joinPath(folder, name);
+      const text = await readText(uri);
+      const index = text?.search(new RegExp(`@\\w+\\s*\\{\\s*${escapeRegExp(key)}\\s*,`)) ?? -1;
+      if (text && index >= 0) return at(uri, text.slice(0, index).split("\n").length - 1);
+    }
+  }
+  return undefined;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

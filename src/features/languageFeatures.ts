@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { IMAGE_FILE, placeFigures } from "../figures";
-import { projectBibliography, projectLabels, type ProjectLabel } from "../project";
+import { findDefinition, projectBibliography, projectLabels, type ProjectLabel } from "../project";
 import { readReferences } from "../references";
 import {
   CITE_COMMANDS,
@@ -28,6 +28,26 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext) {
     vscode.languages.registerCompletionItemProvider(TEX, { provideCompletionItems }, "{", ","),
     vscode.languages.registerHoverProvider(TEX, { provideHover }),
     vscode.languages.registerDocumentSymbolProvider(TEX, { provideDocumentSymbols }),
+    // ⌘/Ctrl-click (and F12) in the raw editor: \ref → \label, \cite → entry, \input → file.
+    vscode.languages.registerDefinitionProvider(TEX, {
+      async provideDefinition(document, position) {
+        const line = document.lineAt(position).text;
+        for (const m of line.matchAll(REFERENCE_CALL)) {
+          if (position.character < m.index! || position.character > m.index! + m[0].length) continue;
+          const command = m[1];
+          const kind = /^(input|include|subfile)$/.test(command) ? "file" : /cite/.test(command) ? "cite" : /ref$/.test(command) ? "label" : undefined;
+          if (!kind) return undefined;
+          let offset = m.index! + m[0].lastIndexOf("{") + 1;
+          const key = m[2].split(",").find((part) => {
+            const hit = position.character >= offset && position.character <= offset + part.length;
+            offset += part.length + 1;
+            return hit;
+          })?.trim() ?? m[2].trim();
+          return findDefinition(document, kind, key);
+        }
+        return undefined;
+      },
+    }),
     vscode.languages.registerDocumentDropEditProvider(TEX, { provideDocumentDropEdits }, {
       providedDropEditKinds: [FIGURE_EDIT],
       dropMimeTypes: ["text/uri-list", "image/*", "files"],

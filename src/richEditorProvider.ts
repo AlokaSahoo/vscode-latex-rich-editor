@@ -2,7 +2,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { rootOf } from "./compile/compileManager";
 import { placeFigures } from "./figures";
-import { projectBibliography, projectLabels } from "./project";
+import { findDefinition, projectBibliography, projectLabels } from "./project";
+import { revealSourceLine } from "./navigation";
 import { readReferences } from "./references";
 import type {
   CustomCommandStyle,
@@ -253,6 +254,17 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
           if ("edit" in action && action.edit) await vscode.workspace.applyEdit(action.edit);
           const command = "command" in action && typeof action.command === "object" ? action.command : (action as vscode.Command);
           if (command?.command) await vscode.commands.executeCommand(command.command, ...(command.arguments ?? []));
+          break;
+        }
+        case "goToDefinition": {
+          const location = await findDefinition(document, message.kind, message.key);
+          if (!location) {
+            vscode.window.setStatusBarMessage(`No definition found for "${message.key}"`, 3000);
+          } else if (location.uri.toString() === key || /\.tex$/i.test(location.uri.path)) {
+            await revealSourceLine(location.uri, location.range.start.line + 1);
+          } else {
+            await vscode.window.showTextDocument(location.uri, { selection: location.range, viewColumn: vscode.ViewColumn.Active });
+          }
           break;
         }
         case "setLayout":

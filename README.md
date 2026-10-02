@@ -22,6 +22,25 @@ Overleaf-style rich-text (WYSIWYM) editing for `.tex` files in VS Code, with com
 - **PDF preview** beside the editor (moon button for dark pages), crisp on high-DPI screens, keeping its scroll position across recompiles. **Double-click the PDF** to jump to the matching source line — in the rich view or the raw editor, whichever you're using.
 - **Clean auxiliary files** in one click.
 
+## Typing helpers (rich view)
+
+Shortcuts use **⌘ on macOS** and **Ctrl on Windows/Linux**.
+
+| You do | You get |
+|---|---|
+| Select text, type `$` `(` `[` `{` `` ` `` `"` | It's wrapped: `$x$`, `(x)`, ``` ``x'' ``` … |
+| Type `"` | ``` `` ``` at a word start, `''` at the end |
+| Type `$` | `$\|$`; type `$` again inside → `$$\|$$` (display); `$` before a closing `$` steps out |
+| Type `\[` or `\(` | `\[ \| \]`, `\( \| \)` |
+| `\begin{name}` + Enter | `\end{name}` added below (with `\item` for lists) |
+| Edit the name in `\begin{…}` | The matching `\end{…}` follows |
+| Enter in a list | Next `\item`; Enter on an empty `\item` ends the list |
+| ⌘B / ⌘I / ⌘U / ⌘M | `\textbf{}` / `\emph{}` / `\underline{}` / `$…$` |
+| ⌘⌥E (Ctrl+Alt+E) | Wrap the selected lines in `\begin{env}…\end{env}` — type the name once, both update |
+| Type `Fig. \ref{` | `Fig.~\ref{` — no line break before the number (also `\eqref`, `\cite`, …) |
+| Paste text from a PDF or Word | Curly quotes, dashes, `…`, ligatures, `%` `&` `_` `#` and broken line wraps fixed for LaTeX (text that already contains LaTeX is pasted as is) |
+| ⌘-click (Ctrl-click) a `\ref`, `\cite` or `\input` | Jump to the `\label`, the bibliography entry, or the file — works in the raw editor too |
+
 ## Getting started
 
 No configuration is needed — there are no build recipes or tool paths to set up. The extension finds TeX by itself:
@@ -86,10 +105,10 @@ A TeX distribution with `latexmk` on your `PATH` (TeX Live, MacTeX or MiKTeX). R
 
 One `.vsix` file works on macOS, Windows and Linux — no Node or npm needed to install it.
 
-1. Download `latex-rich-editor-v0.1.5.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
+1. Download `latex-rich-editor-v0.1.6.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
 2. Install it, either:
    - **In VS Code:** Extensions view (`⌘⇧X` / `Ctrl+Shift+X`) → `…` menu at the top → **Install from VSIX…** → pick the file, or
-   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.5.vsix`
+   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.6.vsix`
 3. Reload VS Code. `.tex` files now open in the rich view.
 4. For compiling, install a TeX distribution with `latexmk`: [MacTeX](https://tug.org/mactex/) on macOS, [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/) on Windows, TeX Live on Linux (e.g. `sudo apt install texlive-full latexmk`).
 
