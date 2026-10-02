@@ -1,0 +1,348 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+#editor {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.lv-dual-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lv-editor-host {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+/* Follow the user's VS Code theme instead of the renderer's fixed palette.
+   The renderer writes its variables inline, so these need !important. */
+.lv-dual-editor {
+  --lv-bg: var(--vscode-editor-background, #ffffff) !important;
+  --lv-fg: var(--vscode-editor-foreground, #1f1f1f) !important;
+  --lv-surface: var(--vscode-editorWidget-background, #f3f3f3) !important;
+  --lv-border: var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35)) !important;
+  --lv-primary: var(--vscode-textLink-foreground, #2f6fca) !important;
+  --lv-command: var(--vscode-textLink-foreground, #2f6fca) !important;
+  --lv-secondary: var(--vscode-descriptionForeground, #6c6c6c) !important;
+  background: var(--vscode-editor-background, #ffffff);
+  color: var(--vscode-editor-foreground, #1f1f1f);
+}
+.lv-dual-editor .cm-editor {
+  background: var(--vscode-editor-background, #ffffff) !important;
+  color: var(--vscode-editor-foreground, #1f1f1f) !important;
+}
+.lv-dual-editor .cm-gutters {
+  background: var(--vscode-editorGutter-background, var(--vscode-editor-background, #ffffff)) !important;
+  color: var(--vscode-editorLineNumber-foreground, #8b8b8b) !important;
+  border-right: none !important;
+}
+.lv-dual-editor .cm-activeLine,
+.lv-dual-editor .cm-activeLineGutter {
+  background: var(--vscode-editor-lineHighlightBackground, rgba(128, 128, 128, 0.07)) !important;
+}
+.lv-dual-editor .cm-activeLineGutter {
+  color: var(--vscode-editorLineNumber-activeForeground, inherit) !important;
+}
+.lv-dual-editor .cm-cursor {
+  border-left-color: var(--vscode-editorCursor-foreground, #1f1f1f) !important;
+}
+.lv-dual-editor .cm-selectionBackground,
+.lv-dual-editor .cm-focused .cm-selectionBackground {
+  background: var(--vscode-editor-selectionBackground, #add6ff) !important;
+}
+
+/* MathLive hard-codes black; use the editor's text color so equations stay
+   readable in dark themes. */
+.lv-dual-editor math-field {
+  color: var(--vscode-editor-foreground, inherit) !important;
+}
+
+/* Mode switching lives in the editor title bar (raw ↔ rich), not here. */
+.lv-mode-bar {
+  display: none !important;
+}
+
+/* Formatting toolbar, styled like VS Code's own toolbars */
+.lv-toolbar {
+  gap: 0 !important;
+  padding: 4px 10px !important;
+  align-items: center;
+  background: var(--vscode-editor-background, #ffffff) !important;
+  border-bottom: 1px solid var(--vscode-editorGroup-border, rgba(128, 128, 128, 0.2)) !important;
+}
+.lv-toolbar-items {
+  gap: 0 !important;
+  row-gap: 2px !important;
+  align-items: center;
+}
+.lv-toolbar-group {
+  gap: 1px !important;
+  padding: 0 6px !important;
+  align-items: center;
+  border-right: 1px solid var(--vscode-editorGroup-border, rgba(128, 128, 128, 0.25)) !important;
+}
+.lv-toolbar-group:first-child {
+  padding-left: 0 !important;
+}
+.lv-toolbar-group:last-child {
+  border-right: none !important;
+}
+.lv-toolbar button {
+  min-width: 26px !important;
+  height: 26px;
+  margin: 0;
+  padding: 0 5px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground, #424242)) !important;
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: 12px !important;
+  font-weight: 600;
+  line-height: 1 !important;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.lv-toolbar button:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(184, 184, 184, 0.31)) !important;
+}
+.lv-toolbar button:active {
+  background: var(--vscode-toolbar-activeBackground, rgba(166, 166, 166, 0.31)) !important;
+}
+.lv-toolbar button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #0078d4);
+  outline-offset: -1px;
+}
+.lv-toolbar .codicon {
+  font-size: 16px;
+}
+.lr-tb-heading {
+  font-size: 11.5px !important;
+  letter-spacing: 0.02em;
+}
+.lr-tb-underline {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 13px !important;
+}
+.lr-tb-smallcaps {
+  font-variant: small-caps;
+  font-size: 13px !important;
+}
+.lr-tb-math {
+  font-family: "Times New Roman", Georgia, serif !important;
+  font-style: italic;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+}
+.lv-toolbar button.lr-tb-picker {
+  min-width: 14px !important;
+  padding: 0 1px !important;
+  margin-left: -2px;
+}
+.lr-tb-picker .codicon {
+  font-size: 12px;
+}
+.lr-tb-color {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground, #424242));
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.lr-tb-color:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(184, 184, 184, 0.31));
+}
+.lr-tb-color-glyph {
+  font: 600 13px var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  line-height: 1;
+}
+.lr-tb-color .codicon {
+  font-size: 14px;
+}
+.lr-tb-color-bar {
+  width: 14px;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 1.5px;
+}
+.lv-toolbar .lr-tb-color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Table-size picker */
+.table-selector-dropdown {
+  background: var(--vscode-editorWidget-background, #f8f8f8) !important;
+  border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35)) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.16));
+}
+.table-grid-cell {
+  border-radius: 2px;
+  border-color: var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4)) !important;
+}
+.table-grid-cell.active {
+  background: var(--vscode-focusBorder, #0078d4) !important;
+  border-color: var(--vscode-focusBorder, #0078d4) !important;
+}
+.table-selector-label {
+  color: var(--vscode-descriptionForeground, #6c6c6c) !important;
+}
+
+/* Hover cards and autocomplete, like VS Code's own widgets */
+.lv-dual-editor .cm-tooltip {
+  background: var(--vscode-editorHoverWidget-background, #f8f8f8) !important;
+  color: var(--vscode-editorHoverWidget-foreground, inherit) !important;
+  border: 1px solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35)) !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.16));
+}
+.lv-dual-editor .cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--vscode-editorSuggestWidget-selectedBackground, #0060c0) !important;
+  color: var(--vscode-editorSuggestWidget-selectedForeground, #ffffff) !important;
+}
+
+/* The text column stands in for the paper's text block (\textwidth), so
+   relative figure widths and physical lengths have a stable reference. */
+.lv-editor-host .cm-editor {
+  height: 100%;
+  max-width: var(--lr-page-width, none);
+  margin: 0 auto;
+}
+/* The renderer lays simple figures out as a shrink-to-fit flex column, so an
+   image's percentage width (from \linewidth etc.) would resolve against its
+   own natural size. Give the wrapper the full line, and center like \centering. */
+.cm-line.cm-lv-figure-simple:not(.cm-lv-table-row) .cm-lv-image {
+  align-self: stretch;
+}
+.cm-line.cm-lv-figure-simple:not(.cm-lv-table-row) .cm-lv-image img {
+  margin-inline: auto;
+  max-height: none;
+}
+
+math-field::part(menu-toggle),
+math-field::part(virtual-keyboard-toggle) {
+  display: none;
+}
+
+/* Front matter */
+.lr-doc-title {
+  font-size: 1.6em;
+  font-weight: 700;
+}
+.lr-doc-author {
+  font-size: 1.1em;
+  font-variant: small-caps;
+}
+.lr-affiliation {
+  font-style: italic;
+  opacity: 0.8;
+}
+.lr-email {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+/* Abstract / acknowledgments: indented block with a heading on its first line */
+.cm-line.lr-abstract,
+.cm-line.lr-acknowledgments {
+  padding-left: 2.5em !important;
+  padding-right: 2.5em !important;
+  font-size: 0.95em;
+}
+.cm-line:not(.lr-abstract) + .cm-line.lr-abstract::before,
+.cm-content > .cm-line.lr-abstract:first-child::before {
+  content: "Abstract";
+  display: block;
+  text-align: center;
+  font-weight: 700;
+  font-variant: small-caps;
+}
+.cm-line:not(.lr-acknowledgments) + .cm-line.lr-acknowledgments::before,
+.cm-content > .cm-line.lr-acknowledgments:first-child::before {
+  content: "Acknowledgments";
+  display: block;
+  font-weight: 700;
+}
+
+/* \ref / \eqref / \cite resolved to their numbers from the last compile */
+.lr-ref {
+  color: var(--vscode-textLink-foreground, #2f6fca);
+  cursor: pointer;
+}
+.lr-ref:hover {
+  text-decoration: underline;
+}
+
+/* Hover cards for \ref / \eqref / \cite */
+.lr-hover {
+  max-width: 440px;
+  padding: 6px 10px;
+  font-size: 0.92em;
+  line-height: 1.4;
+}
+.lr-hover-heading {
+  font-weight: 600;
+  margin-top: 2px;
+}
+.lr-hover-math {
+  display: block;
+  margin: 4px 0;
+  font-size: 1.1em;
+  border: none;
+  background: transparent;
+}
+.lr-hover-image {
+  display: block;
+  max-width: 400px;
+  max-height: 260px;
+  margin: 6px 0;
+  background: #fff;
+}
+.lr-hover-caption {
+  opacity: 0.8;
+}
+.lr-hover-cite {
+  margin: 2px 0;
+}
+
+/* {\color{...} text} scopes are a visual-mode rendering only */
+.lr-source-mode .lr-color-scope {
+  color: inherit !important;
+}
+
+/* Line jumped to from the PDF */
+.cm-line.lr-flash-line {
+  animation: lr-flash 1.5s ease-out;
+}
+@keyframes lr-flash {
+  from {
+    background-color: rgba(255, 196, 0, 0.45);
+  }
+  to {
+    background-color: transparent;
+  }
+}

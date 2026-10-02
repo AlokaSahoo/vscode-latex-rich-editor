@@ -8,3 +8,8 @@ sample/*.aux
 sample/*.fdb_latexmk
 sample/*.fls
 sample/*.synctex.gz
+sample/*.bbl
+sample/*.blg
+sample/*Notes.bib
+sample/*.out
+sample/*.synctex(busy)

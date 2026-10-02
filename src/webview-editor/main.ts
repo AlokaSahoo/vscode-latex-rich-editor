@@ -1,39 +1,22 @@
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { latex } from "codemirror-lang-latex";
-import {
-  DualLatexEditor,
-  createImageResolver,
-  imageResolver,
-  getLanguage,
-} from "codemirror-visual-markup";
+import { DualLatexEditor, createImageResolver, imageResolver } from "codemirror-visual-markup";
+import * as pdfjsLib from "pdfjs-dist";
 import "codemirror-visual-markup/dist/styles.css";
-import type { CustomCommandStyle, HostToWebviewMessage, WebviewToHostMessage } from "./protocol";
-
-const CUSTOM_STYLE_CLASS: Record<CustomCommandStyle, string> = {
-  bold: "cm-lv-bold",
-  italic: "cm-lv-italic",
-  underline: "cm-lv-underline",
-  reference: "cm-lv-cmd",
-  hidden: "cm-lv-cmd-unknown",
-};
-
-// The library's LaTeX Language object is a shared singleton keyed by id
-// ("latex"), retrieved internally by DualLatexEditor via getLanguage().
-// There's no public hook to extend its command styling, so we patch its
-// style() function once, before it's used, to check user config first.
-function applyCustomCommandStyles(customCommands: Record<string, CustomCommandStyle>) {
-  const language = getLanguage("latex");
-  const originalStyle = language.style;
-  language.style = (token) => {
-    if (token.kind === "command" && token.name) {
-      const category = customCommands[token.name];
-      if (category === "hidden") return { hidden: true };
-      if (category) return { class: CUSTOM_STYLE_CLASS[category] };
-    }
-    return originalStyle(token);
-  };
-}
+import "./editor.css";
+import { modernizeToolbar } from "./toolbar";
+import { followThemeChanges, isDarkTheme, themeExtension } from "./theme";
+import {
+  attachEnhancementsToDom,
+  configureEnhancements,
+  enhancementExtensions,
+  revealLine,
+  setReferences,
+  setVisualMode,
+} from "./latexEnhancements";
+import type { HostToWebviewMessage, ImageKind, WebviewToHostMessage } from "./protocol";
+import { resolveFigures, setFigureUploader, setImageLoader, setProjectData, smartExtensions } from "./smartFeatures";
 
 declare function acquireVsCodeApi(): {
   postMessage(message: WebviewToHostMessage): void;
@@ -42,8 +25,7 @@ declare function acquireVsCodeApi(): {
 const vscode = acquireVsCodeApi();
 
 let applyingRemoteUpdate = false;
-let view: EditorView;
-let dualEditor: DualLatexEditor;
+let view: EditorView | undefined;
 
 function post(message: WebviewToHostMessage) {
   vscode.postMessage(message);
@@ -57,59 +39,95 @@ function scheduleEditPost(text: string) {
 
 // Images are relative to the .tex file's own folder; the webview has no
 // filesystem access, so path resolution is offloaded to the extension host,
-// which converts the relative path into a webview-loadable resource URI.
+// which also finds the file when the extension is omitted and reports
+// whether it's a PDF (which an <img> can't show, so it's rasterized here).
 let resolveRequestId = 0;
-const pendingImageResolves = new Map<string, (url: string | null) => void>();
+const pendingImageResolves = new Map<string, (result: { url: string | null; kind: ImageKind }) => void>();
 
 const resolver = createImageResolver(
   () => "/document",
-  (resolvedPath) =>
-    new Promise<string | null>((resolve) => {
+  async (resolvedPath) => {
+    const { url, kind } = await new Promise<{ url: string | null; kind: ImageKind }>((resolve) => {
       const id = String(resolveRequestId++);
       pendingImageResolves.set(id, resolve);
       post({ type: "resolveImage", requestId: id, path: resolvedPath });
-    }),
+    });
+    if (!url) return null;
+    return kind === "pdf" ? rasterizePdf(url) : url;
+  },
 );
+
+async function rasterizePdf(url: string): Promise<string | null> {
+  try {
+    const pdf = await pdfjsLib.getDocument(url).promise;
+    const page = await pdf.getPage(1);
+    const natural = page.getViewport({ scale: 1 });
+    const scale = Math.min(4, Math.max(2, 1400 / natural.width));
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const context = canvas.getContext("2d")!;
+    // Figures are drawn on white paper; keep that in dark themes too.
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: context, viewport }).promise;
+    await pdf.destroy();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    return blob ? `${URL.createObjectURL(blob)}#lr-pt=${natural.width.toFixed(2)}` : null;
+  } catch {
+    return null;
+  }
+}
 
 const updateListener = EditorView.updateListener.of((update) => {
   if (!update.docChanged || applyingRemoteUpdate) return;
   scheduleEditPost(update.state.doc.toString());
 });
 
-function isDarkTheme(): boolean {
-  return (
-    document.body.classList.contains("vscode-dark") ||
-    document.body.classList.contains("vscode-high-contrast")
-  );
-}
 
-function createEditor(initialText: string, customCommands: Record<string, CustomCommandStyle>) {
-  applyCustomCommandStyles(customCommands);
+function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = message.pdfWorkerUrl;
+  configureEnhancements(message.customCommands);
+  setReferences(undefined, message.references);
+  setProjectData(message.project);
+  setImageLoader((resolvedPath, src) => resolver.resolve(resolvedPath, src));
+  setFigureUploader((requestId, files, uris) => post({ type: "addFigures", requestId, files, uris }));
+  if (message.pageWidth > 0) {
+    document.documentElement.style.setProperty("--lr-page-width", `${message.pageWidth}px`);
+  }
+
   const state = EditorState.create({
-    doc: initialText,
+    doc: message.text,
     extensions: [
       basicSetup,
-      latex(),
+      latex({ enableAutocomplete: false }),
       updateListener,
       imageResolver.of(resolver),
       EditorView.lineWrapping,
+      ...enhancementExtensions(),
+      ...smartExtensions(),
+      themeExtension(),
     ],
   });
   view = new EditorView({ state });
   const container = document.getElementById("editor")!;
-  dualEditor = new DualLatexEditor(container, view, {
+  attachEnhancementsToDom(container);
+  const editor = new DualLatexEditor(container, view, {
     initialMode: "visual",
-    showToolbar: true,
+    showToolbar: message.showToolbar,
     theme: isDarkTheme() ? "dark" : "light",
+    onModeChange: (mode) => {
+      container.classList.toggle("lr-source-mode", mode === "source");
+      setVisualMode(view, mode === "visual");
+    },
   });
+  modernizeToolbar(container);
+  followThemeChanges(view, (dark) => editor.setTheme(dark ? "dark" : "light"));
 }
 
 function applyRemoteText(text: string) {
-  if (!view) {
-    createEditor(text, {});
-    return;
-  }
-  if (view.state.doc.toString() === text) return;
+  if (!view || view.state.doc.toString() === text) return;
   applyingRemoteUpdate = true;
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: text },
@@ -121,14 +139,26 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
   const message = event.data;
   switch (message.type) {
     case "init":
-      createEditor(message.text, message.customCommands);
+      createEditor(message);
       break;
     case "update":
       applyRemoteText(message.text);
       break;
     case "imageResolved":
-      pendingImageResolves.get(message.requestId)?.(message.url);
+      pendingImageResolves.get(message.requestId)?.({ url: message.url, kind: message.kind });
       pendingImageResolves.delete(message.requestId);
+      break;
+    case "revealLine":
+      if (view) revealLine(view, message.line);
+      break;
+    case "references":
+      setReferences(view, message.references);
+      break;
+    case "project":
+      setProjectData(message.project);
+      break;
+    case "figuresAdded":
+      resolveFigures(message.requestId, message.paths);
       break;
   }
 });

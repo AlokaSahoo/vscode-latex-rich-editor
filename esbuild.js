@@ -49,6 +49,8 @@ const webviewEditorConfig = {
   target: "es2022",
   sourcemap: false,
   minify: production,
+  // VS Code's icon font, referenced from codicon.css
+  loader: { ".ttf": "file" },
 };
 
 /** @type {import('esbuild').BuildOptions} */

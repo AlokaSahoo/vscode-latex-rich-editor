@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0E7C74"/>
+      <stop offset="1" stop-color="#2E3192"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#C9D3E6"/>
+      <stop offset="1" stop-color="#9AA8C4"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+  <!-- page with folded corner -->
+  <path d="M70 38 H160 L198 76 V210 a8 8 0 0 1 -8 8 H70 a8 8 0 0 1 -8 -8 V46 a8 8 0 0 1 8 -8 Z" fill="#FFFFFF"/>
+  <path d="M160 38 V68 a8 8 0 0 0 8 8 H198 Z" fill="url(#fold)"/>
+  <!-- sigma -->
+  <path d="M82 62 H140 V78 H106 L126 100 L106 122 H142 V138 H82 V124 L104 100 L82 76 Z" fill="#1F2A5A"/>
+  <!-- rich text lines -->
+  <rect x="82" y="156" width="96" height="10" rx="5" fill="#E0403A"/>
+  <rect x="82" y="174" width="74" height="10" rx="5" fill="#2F6FCA"/>
+  <rect x="82" y="192" width="88" height="10" rx="5" fill="#B8C1D3"/>
+</svg>

@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import { commandTexDocument, tabUri } from "./activeDocument";
 import { RichEditorProvider } from "./richEditorProvider";
-import { compileDocument, createOutputChannel } from "./compile/compileManager";
+import { cleanAuxiliaryFiles, compileDocument, createOutputChannel } from "./compile/compileManager";
+import { registerLanguageFeatures } from "./features/languageFeatures";
+import { registerOutlineView } from "./features/outlineView";
+import { registerPaperTools } from "./features/paperTools";
 import { PdfPreviewPanel } from "./preview/pdfPreviewPanel";
 
 export function activate(context: vscode.ExtensionContext) {
@@ -10,58 +15,82 @@ export function activate(context: vscode.ExtensionContext) {
   const diagnostics = vscode.languages.createDiagnosticCollection("latexRich");
   context.subscriptions.push(outputChannel, diagnostics);
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("latexRich.compile", async () => {
-      const document = getActiveTexDocument();
-      if (!document) {
-        vscode.window.showWarningMessage("No .tex file is active.");
-        return;
-      }
-      await document.save();
-      const result = await compileDocument(document, outputChannel, diagnostics);
-      if (result.success) {
-        PdfPreviewPanel.show(context, result.pdfPath);
-      } else {
-        vscode.window.showErrorMessage(
-          "LaTeX compile failed. See the LaTeX Rich Editor output panel for details.",
-        );
-      }
-    }),
-  );
+  registerLanguageFeatures(context);
+  registerOutlineView(context);
+  registerPaperTools(context, outputChannel);
 
+  const compileAndPreview = async (document: vscode.TextDocument) => {
+    await document.save();
+    const result = await compileDocument(document, outputChannel, diagnostics);
+    if (result.success) {
+      PdfPreviewPanel.show(context, result.pdfPath);
+    } else {
+      vscode.window.showErrorMessage(
+        result.problem ?? "LaTeX compile failed. See the LaTeX Rich Editor output panel for details.",
+      );
+    }
+  };
+
+  // Editor title-bar buttons pass the clicked editor's URI; keybindings and
+  // the Command Palette don't, so fall back to the active tab.
   context.subscriptions.push(
-    vscode.commands.registerCommand("latexRich.showPreview", () => {
-      const document = getActiveTexDocument();
-      if (!document) {
-        vscode.window.showWarningMessage("No .tex file is active.");
-        return;
-      }
-      const pdfPath = document.uri.fsPath.replace(/\.tex$/, ".pdf");
-      PdfPreviewPanel.show(context, pdfPath);
+    vscode.commands.registerCommand("latexRich.compile", async (uri?: unknown) => {
+      const document = await commandTexDocument(uri);
+      if (document) await compileAndPreview(document);
+    }),
+
+    vscode.commands.registerCommand("latexRich.showPreview", async (uri?: unknown) => {
+      const document = await commandTexDocument(uri);
+      if (!document) return;
+      const pdfPath = document.uri.fsPath.replace(/\.tex$/i, ".pdf");
+      if (fs.existsSync(pdfPath)) PdfPreviewPanel.show(context, pdfPath);
+      else await compileAndPreview(document);
+    }),
+
+    vscode.commands.registerCommand("latexRich.openRich", (uri?: unknown) =>
+      reopenTexFile(uri, RichEditorProvider.viewType),
+    ),
+    vscode.commands.registerCommand("latexRich.openRaw", (uri?: unknown) => reopenTexFile(uri, "default")),
+
+    vscode.commands.registerCommand("latexRich.clean", async (uri?: unknown) => {
+      const document = await commandTexDocument(uri);
+      if (!document) return;
+      const removed = await cleanAuxiliaryFiles(document);
+      vscode.window.setStatusBarMessage(
+        removed.length > 0
+          ? `$(trash) Removed ${removed.length} auxiliary file${removed.length === 1 ? "" : "s"}`
+          : "No auxiliary files to remove",
+        4000,
+      );
     }),
   );
 }
 
-function getActiveTexDocument(): vscode.TextDocument | undefined {
-  const active = vscode.window.activeTextEditor?.document;
-  if (active && active.uri.fsPath.endsWith(".tex")) return active;
+// Switches the active .tex tab between the rich view and VS Code's plain
+// text editor in place, like toggling Markdown's preview.
+async function reopenTexFile(uri: unknown, viewType: string) {
+  const document = await commandTexDocument(uri);
+  if (!document) return;
+  const key = document.uri.toString();
+  const column = (
+    vscode.window.tabGroups.all.find((g) => tabUri(g.activeTab)?.toString() === key) ??
+    vscode.window.tabGroups.activeTabGroup
+  ).viewColumn;
+  // Both views share one document; saving first means closing the old tab
+  // can never prompt about unsaved changes.
+  if (document.isDirty) await document.save();
+  await vscode.commands.executeCommand("vscode.openWith", document.uri, viewType, column);
 
-  // Custom editors (our rich editor) don't populate activeTextEditor, so
-  // fall back to inspecting the active tab directly.
-  for (const group of vscode.window.tabGroups.all) {
-    for (const tab of group.tabs) {
-      if (
-        tab.isActive &&
-        tab.input instanceof vscode.TabInputCustom &&
-        tab.input.uri.fsPath.endsWith(".tex")
-      ) {
-        return vscode.workspace.textDocuments.find(
-          (d) => d.uri.toString() === (tab.input as vscode.TabInputCustom).uri.toString(),
-        );
-      }
-    }
-  }
-  return undefined;
+  const wantRich = viewType === RichEditorProvider.viewType;
+  const group = vscode.window.tabGroups.all.find((g) => g.viewColumn === column);
+  const stale = group?.tabs.find((tab) =>
+    wantRich
+      ? tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === key
+      : tab.input instanceof vscode.TabInputCustom &&
+        tab.input.viewType === RichEditorProvider.viewType &&
+        tab.input.uri.toString() === key,
+  );
+  if (stale) await vscode.window.tabGroups.close(stale, true);
 }
 
 export function deactivate() {}

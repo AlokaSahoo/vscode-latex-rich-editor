@@ -2,6 +2,8 @@
 src/**
 node_modules/**
 sample/**
+patches/**
+images/*.svg
 esbuild.js
 tsconfig.json
 *.map

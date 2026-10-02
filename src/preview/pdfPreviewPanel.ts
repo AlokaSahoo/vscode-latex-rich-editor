@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import type { HostToPreviewMessage } from "./protocol";
+import { revealSourceLine } from "../navigation";
+import { inverseSearch, loadSynctex } from "../synctex";
+import type { HostToPreviewMessage, PreviewToHostMessage } from "./protocol";
 
 export class PdfPreviewPanel {
   private static current: PdfPreviewPanel | undefined;
@@ -12,17 +14,15 @@ export class PdfPreviewPanel {
     private readonly context: vscode.ExtensionContext,
     column: vscode.ViewColumn,
   ) {
-    this.panel = vscode.window.createWebviewPanel(
-      "latexRich.pdfPreview",
-      "LaTeX PDF Preview",
-      column,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "dist")],
-      },
-    );
+    this.panel = vscode.window.createWebviewPanel("latexRich.pdfPreview", "LaTeX PDF Preview", column, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "dist")],
+    });
     this.panel.webview.html = this.getHtml();
+    this.panel.webview.onDidReceiveMessage((message: PreviewToHostMessage) => {
+      if (message.type === "inverseSearch") void this.inverseSearch(message.page, message.x, message.y);
+    });
     this.panel.onDidDispose(() => {
       if (PdfPreviewPanel.current === this) {
         PdfPreviewPanel.current = undefined;
@@ -39,10 +39,18 @@ export class PdfPreviewPanel {
     PdfPreviewPanel.current.load(pdfPath);
   }
 
-  public static reloadIfShowing(context: vscode.ExtensionContext, pdfPath: string): void {
-    if (PdfPreviewPanel.current?.pdfPath === pdfPath) {
-      PdfPreviewPanel.current.load(pdfPath);
+  private async inverseSearch(page: number, x: number, y: number) {
+    if (!this.pdfPath) return;
+    const data = loadSynctex(this.pdfPath);
+    if (!data) {
+      vscode.window.showInformationMessage(
+        "No SyncTeX data next to this PDF — compile the document to enable jumping to the source.",
+      );
+      return;
     }
+    const location = inverseSearch(data, page, x, y);
+    if (!location) return;
+    await revealSourceLine(vscode.Uri.file(location.file), location.line);
   }
 
   private load(pdfPath: string) {
@@ -78,18 +86,30 @@ export class PdfPreviewPanel {
       vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview-preview.js"),
     );
     const nonce = getNonce();
+    const csp = webview.cspSource;
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data: blob:; script-src 'nonce-${nonce}' ${webview.cspSource}; worker-src ${webview.cspSource}; connect-src ${webview.cspSource}; style-src 'unsafe-inline';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp} data: blob:; script-src 'nonce-${nonce}' ${csp}; worker-src ${csp} blob:; connect-src ${csp}; style-src 'unsafe-inline';" />
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; background: #525659; }
-    #pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; }
-    .pdf-page { box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+    html, body { min-height: 100%; margin: 0; padding: 0; background: #525659; }
+    #pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; color: #eee; }
+    .pdf-page { max-width: 100%; height: auto; box-shadow: 0 1px 4px rgba(0,0,0,0.5); cursor: text; }
+    body.dark-pages { background: #1e1e1e; }
+    body.dark-pages .pdf-page { filter: invert(0.88) hue-rotate(180deg); }
+    #dark-toggle {
+      position: fixed; top: 10px; right: 14px; z-index: 10;
+      width: 30px; height: 30px; border: none; border-radius: 15px; cursor: pointer;
+      background: rgba(30,30,30,0.7); color: #eee; font-size: 15px; line-height: 30px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4); opacity: 0.75;
+    }
+    #dark-toggle:hover { opacity: 1; }
+    body.dark-pages #dark-toggle { background: rgba(240,240,240,0.85); color: #222; }
   </style>
 </head>
 <body>
+  <button id="dark-toggle" aria-label="Toggle dark pages">&#9790;</button>
   <div id="pages"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

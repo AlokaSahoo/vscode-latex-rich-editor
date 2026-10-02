@@ -1,17 +1,35 @@
 {
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
-  "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile and PDF preview.",
-  "version": "0.0.1",
+  "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
+  "version": "0.1.0",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlokaSahoo/vscode-latex-rich-editor"
+  },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.97.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
   ],
-  "activationEvents": [],
+  "keywords": [
+    "latex",
+    "tex",
+    "revtex",
+    "overleaf",
+    "wysiwyg",
+    "pdf",
+    "synctex"
+  ],
+  "activationEvents": [
+    "onLanguage:latex",
+    "onLanguage:tex"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "customEditors": [
@@ -28,18 +46,84 @@
     ],
     "commands": [
       {
-        "command": "latexRich.toggleSourceView",
-        "title": "LaTeX Rich Editor: Toggle Rich/Source View"
+        "command": "latexRich.openRich",
+        "category": "LaTeX",
+        "title": "Open Rich View",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "latexRich.openRaw",
+        "category": "LaTeX",
+        "title": "Reopen as Raw LaTeX",
+        "icon": "$(code)"
       },
       {
         "command": "latexRich.compile",
-        "title": "LaTeX Rich Editor: Compile",
+        "category": "LaTeX",
+        "title": "Compile",
         "icon": "$(play)"
       },
       {
         "command": "latexRich.showPreview",
-        "title": "LaTeX Rich Editor: Show PDF Preview",
-        "icon": "$(preview)"
+        "category": "LaTeX",
+        "title": "Open PDF Preview to the Side",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "latexRich.clean",
+        "category": "LaTeX",
+        "title": "Clean Auxiliary Files",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "latexRich.prepareArxiv",
+        "category": "LaTeX",
+        "title": "Prepare arXiv Submission",
+        "icon": "$(package)"
+      },
+      {
+        "command": "latexRich.lengthCheck",
+        "category": "LaTeX",
+        "title": "Check PRL Length"
+      },
+      {
+        "command": "latexRich.newPaper",
+        "category": "LaTeX",
+        "title": "New REVTeX Paper…"
+      },
+      {
+        "command": "latexRich.revealLine",
+        "category": "LaTeX",
+        "title": "Go to Line"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "latexRich.outline",
+          "name": "LaTeX Outline",
+          "when": "latexRich.hasTexDocument"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "latexRich.showPreview",
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "when": "resourceExtname == .tex"
+      },
+      {
+        "command": "latexRich.openRich",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "resourceExtname == .tex && activeEditor == workbench.editors.files.textFileEditor"
+      },
+      {
+        "command": "latexRich.openRaw",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "activeCustomEditorId == latexRich.richEditor"
       }
     ],
     "configuration": {
@@ -48,25 +132,81 @@
         "latexRich.customCommands": {
           "type": "object",
           "default": {},
-          "markdownDescription": "Style unrecognized LaTeX commands (e.g. REVTeX's `\\affiliation`, `\\eqref`, or your own macros) in the rich-text view. Map a command name (no backslash) to one of: `bold`, `italic`, `underline`, `reference`, `hidden`. Example: `{ \"eqref\": \"reference\", \"affiliation\": \"bold\" }`. Applies the next time a file is opened in the rich editor.",
+          "markdownDescription": "Style LaTeX commands the rich view doesn't recognize (your own macros, package commands). Map a command name (no backslash) to one of: `bold`, `italic`, `underline`, `reference`, `hidden`. Example: `{ \"keyterm\": \"bold\", \"todo\": \"hidden\" }`. Common REVTeX commands (`\\affiliation`, `\\email`, `\\eqref`, `\\onlinecite`, …) are styled already. Applies the next time a file is opened in the rich editor.",
           "additionalProperties": {
             "type": "string",
-            "enum": ["bold", "italic", "underline", "reference", "hidden"]
+            "enum": [
+              "bold",
+              "italic",
+              "underline",
+              "reference",
+              "hidden"
+            ]
           }
+        },
+        "latexRich.pageWidth": {
+          "type": "number",
+          "default": 880,
+          "minimum": 0,
+          "markdownDescription": "Maximum width in pixels of the rich view's text column. It stands in for the paper's `\\textwidth`, so figures sized with `\\linewidth`, `\\columnwidth`, `scale=` or physical units keep their proportions. `0` uses the full editor width. Applies the next time a file is opened."
+        },
+        "latexRich.showToolbar": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the formatting toolbar (bold, headings, math, lists, tables, colors) above the rich view. Applies the next time a file is opened."
         }
       }
     },
     "menus": {
       "editor/title": [
         {
+          "command": "latexRich.openRich",
+          "when": "resourceExtname == .tex && activeEditor == workbench.editors.files.textFileEditor",
+          "group": "navigation@1"
+        },
+        {
+          "command": "latexRich.openRaw",
+          "when": "activeCustomEditorId == latexRich.richEditor",
+          "group": "navigation@1"
+        },
+        {
           "command": "latexRich.compile",
           "when": "resourceExtname == .tex",
-          "group": "navigation@1"
+          "group": "navigation@2"
         },
         {
           "command": "latexRich.showPreview",
           "when": "resourceExtname == .tex",
-          "group": "navigation@2"
+          "group": "navigation@3"
+        },
+        {
+          "command": "latexRich.clean",
+          "when": "resourceExtname == .tex",
+          "group": "1_latex@1"
+        },
+        {
+          "command": "latexRich.lengthCheck",
+          "when": "resourceExtname == .tex",
+          "group": "1_latex@2"
+        },
+        {
+          "command": "latexRich.prepareArxiv",
+          "when": "resourceExtname == .tex",
+          "group": "1_latex@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "latexRich.revealLine",
+          "when": "false"
+        },
+        {
+          "command": "latexRich.openRich",
+          "when": "resourceExtname == .tex"
+        },
+        {
+          "command": "latexRich.openRaw",
+          "when": "activeCustomEditorId == latexRich.richEditor"
         }
       ]
     }
@@ -78,6 +218,7 @@
     "vscode:prepublish": "node esbuild.js --production"
   },
   "dependencies": {
+    "@vscode/codicons": "^0.0.45",
     "codemirror": "^6.0.1",
     "codemirror-lang-latex": "^0.6.1",
     "codemirror-visual-markup": "github:TeXlyre/codemirror-visual-markup",
@@ -86,7 +227,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.97.0",
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.23.0",
     "patch-package": "^8.0.1",
