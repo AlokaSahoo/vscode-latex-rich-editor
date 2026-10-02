@@ -106,6 +106,26 @@
         "command": "latexRich.revealLine",
         "category": "LaTeX",
         "title": "Go to Line"
+      },
+      {
+        "command": "latexRich.pageWider",
+        "category": "LaTeX",
+        "title": "Rich View: Wider Page"
+      },
+      {
+        "command": "latexRich.pageNarrower",
+        "category": "LaTeX",
+        "title": "Rich View: Narrower Page"
+      },
+      {
+        "command": "latexRich.pageFullWidth",
+        "category": "LaTeX",
+        "title": "Rich View: Toggle Full Width"
+      },
+      {
+        "command": "latexRich.pageAlign",
+        "category": "LaTeX",
+        "title": "Rich View: Toggle Left / Center Alignment"
       }
     ],
     "views": {
@@ -165,7 +185,7 @@
           "type": "number",
           "default": 880,
           "minimum": 0,
-          "markdownDescription": "Maximum width in pixels of the rich view's text column. It stands in for the paper's `\\textwidth`, so figures sized with `\\linewidth`, `\\columnwidth`, `scale=[...]`, etc. fit the page."
+          "markdownDescription": "Width in pixels of the rich view's text column (`0` = full editor width). It also stands in for the paper's `\\textwidth` when sizing figures. Change it with the width buttons at the right end of the toolbar."
         },
         "latexRich.showToolbar": {
           "type": "boolean",
@@ -215,6 +235,15 @@
           "default": 3750,
           "minimum": 1,
           "markdownDescription": "Word limit the count is compared against: 3750 for Letters, 750 for PRL Comments/Replies."
+        },
+        "latexRich.pageAlign": {
+          "type": "string",
+          "enum": [
+            "center",
+            "left"
+          ],
+          "default": "center",
+          "markdownDescription": "Position of the rich view's text column when it's narrower than the editor."
         }
       }
     },

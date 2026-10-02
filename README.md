@@ -120,7 +120,8 @@ Install a checker extension — [LTeX+](https://marketplace.visualstudio.com/ite
 | `latexRich.wordCount` | `revtex` | When to show the status-bar word count: `revtex` (every REVTeX paper), `prl` (only `prl`), `always`, or `off`. |
 | `latexRich.wordLimit` | `3750` | Limit the count is compared against (3750 for Letters, 750 for PRL Comments). |
 | `latexRich.showToolbar` | `true` | Show the formatting toolbar above the rich view. |
-| `latexRich.pageWidth` | `880` | Max width (px) of the rich view's text column, which stands in for `\textwidth` when sizing figures. `0` = full editor width. |
+| `latexRich.pageWidth` | `880` | Width (px) of the rich view's text column, which also stands in for `\textwidth` when sizing figures. `0` = full editor width. Easiest to change with the **− / + / full-width** buttons at the right end of the toolbar. |
+| `latexRich.pageAlign` | `center` | `center` or `left` — also a toolbar button. |
 
 Both apply the next time a file is opened in the rich view.
 

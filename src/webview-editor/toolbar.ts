@@ -1,6 +1,7 @@
 import type { Extension } from "@codemirror/state";
 import { DualVisualEditor } from "codemirror-visual-markup";
 import "@vscode/codicons/dist/codicon.css";
+import type { PageAlign } from "./protocol";
 
 // The renderer's mode bar (Source / Visual / Show source / Math hover) is
 // replaced by the extension's own raw ↔ rich toggle, so its shortcuts go too
@@ -70,7 +71,81 @@ function styleColorInput(input: HTMLInputElement) {
   wrapper.append(glyph, bar, input);
 }
 
+// --- Page width / alignment controls (right end of the toolbar) ---------------
+
+let layout = { pageWidth: 880, pageAlign: "center" as PageAlign };
+let sendLayout: (change: { pageWidth?: number; pageAlign?: PageAlign }) => void = () => {};
+
+/** Applies width/alignment to the page and remembers it for the buttons. */
+export function applyLayout(pageWidth: number, pageAlign: PageAlign) {
+  layout = { pageWidth, pageAlign };
+  const root = document.documentElement;
+  if (pageWidth > 0) root.style.setProperty("--lr-page-width", `${pageWidth}px`);
+  else root.style.removeProperty("--lr-page-width");
+  root.classList.toggle("lr-align-left", pageAlign === "left");
+  document.querySelectorAll<HTMLElement>(".lr-layout-group button").forEach(updateLayoutButton);
+}
+
+export function setLayoutSender(send: typeof sendLayout) {
+  sendLayout = send;
+}
+
+const LAYOUT_BUTTONS: Array<{ key: string; run: () => void }> = [
+  { key: "align", run: () => sendLayout({ pageAlign: layout.pageAlign === "left" ? "center" : "left" }) },
+  { key: "narrower", run: () => sendLayout({ pageWidth: Math.max(480, (layout.pageWidth || window.innerWidth) - 80) }) },
+  { key: "wider", run: () => sendLayout({ pageWidth: Math.max(480, (layout.pageWidth || window.innerWidth) + 80) }) },
+  { key: "full", run: () => sendLayout({ pageWidth: layout.pageWidth === 0 ? 880 : 0 }) },
+];
+
+function updateLayoutButton(button: HTMLElement) {
+  const icon = button.firstElementChild as HTMLElement;
+  switch (button.dataset.layout) {
+    case "align":
+      icon.className = "codicon codicon-layout-sidebar-left";
+      button.title = layout.pageAlign === "left" ? "Center the page" : "Align the page to the left";
+      button.classList.toggle("lr-tb-on", layout.pageAlign === "left");
+      break;
+    case "narrower":
+      icon.className = "codicon codicon-remove";
+      button.title = "Narrower page";
+      break;
+    case "wider":
+      icon.className = "codicon codicon-add";
+      button.title = "Wider page";
+      break;
+    case "full":
+      icon.className = `codicon codicon-${layout.pageWidth === 0 ? "screen-normal" : "screen-full"}`;
+      button.title = layout.pageWidth === 0 ? "Fixed page width" : "Use the full editor width";
+      button.classList.toggle("lr-tb-on", layout.pageWidth === 0);
+      break;
+  }
+  button.setAttribute("aria-label", button.title);
+}
+
+function addLayoutGroup(root: HTMLElement) {
+  const items = root.querySelector(".lv-toolbar-items");
+  if (!items || items.querySelector(".lr-layout-group")) return;
+  const group = document.createElement("div");
+  group.className = "lv-toolbar-group lr-layout-group";
+  for (const spec of LAYOUT_BUTTONS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.layout = spec.key;
+    button.appendChild(document.createElement("span"));
+    // Keep editor focus/selection; these don't edit the document.
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      spec.run();
+    });
+    updateLayoutButton(button);
+    group.appendChild(button);
+  }
+  items.appendChild(group);
+}
+
 function styleToolbar(root: HTMLElement) {
+  addLayoutGroup(root);
   root.querySelectorAll<HTMLButtonElement>(".lv-toolbar button[data-item]").forEach(styleButton);
   root.querySelectorAll<HTMLInputElement>(".lv-toolbar input[type=color]").forEach(styleColorInput);
   // Pair the size-picker chevron with the table button, like a split button.

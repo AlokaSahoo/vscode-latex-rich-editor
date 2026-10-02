@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import { activeTexDocument, commandTexDocument, tabUri } from "./activeDocument";
-import { RichEditorProvider } from "./richEditorProvider";
+import { RichEditorProvider, updateLayout } from "./richEditorProvider";
 import { cleanAuxiliaryFiles, compileDocument, createOutputChannel, pdfOf } from "./compile/compileManager";
 import { registerLanguageFeatures } from "./features/languageFeatures";
 import { registerOutlineView } from "./features/outlineView";
@@ -86,6 +86,25 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.languages.onDidChangeDiagnostics((e) => {
       for (const uri of e.uris) RichEditorProvider.refreshDiagnostics(uri);
     }),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("latexRich.pageWidth") || e.affectsConfiguration("latexRich.pageAlign")) {
+        RichEditorProvider.broadcastLayout();
+      }
+    }),
+    // Page width/alignment of the rich view; the toolbar has buttons for these too.
+    ...(() => {
+      const width = () => vscode.workspace.getConfiguration("latexRich").get<number>("pageWidth", 880);
+      const step = (delta: number) => () => updateLayout(Math.max(480, (width() || 1200) + delta));
+      return [
+        vscode.commands.registerCommand("latexRich.pageWider", step(80)),
+        vscode.commands.registerCommand("latexRich.pageNarrower", step(-80)),
+        vscode.commands.registerCommand("latexRich.pageFullWidth", () => updateLayout(width() === 0 ? 880 : 0)),
+        vscode.commands.registerCommand("latexRich.pageAlign", () => {
+          const align = vscode.workspace.getConfiguration("latexRich").get<string>("pageAlign", "center");
+          return updateLayout(undefined, align === "left" ? "center" : "left");
+        }),
+      ];
+    })(),
     vscode.commands.registerCommand("latexRich.syncToPdf", async (uri?: unknown) => {
       const document = await commandTexDocument(uri);
       if (document) syncToCursor(document, pdfOf(document), false);

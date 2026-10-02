@@ -27,6 +27,8 @@ export interface EditorDiagnostic {
   source?: string;
 }
 
+export type PageAlign = "center" | "left";
+
 export interface FixOption {
   index: number;
   title: string;
@@ -43,6 +45,7 @@ export type HostToWebviewMessage =
       text: string;
       customCommands: Record<string, CustomCommandStyle>;
       pageWidth: number;
+      pageAlign: PageAlign;
       showToolbar: boolean;
       pdfWorkerUrl: string;
       references: ReferenceTable;
@@ -56,6 +59,7 @@ export type HostToWebviewMessage =
   | { type: "imageResolved"; requestId: string; url: string | null; kind: ImageKind }
   | { type: "figuresAdded"; requestId: string; paths: string[]; error?: string }
   | { type: "revealLine"; line: number }
+  | { type: "layout"; pageWidth: number; pageAlign: PageAlign }
   | { type: "fixes"; requestId: string; fixes: FixOption[] };
 
 export type WebviewToHostMessage =
@@ -64,6 +68,7 @@ export type WebviewToHostMessage =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "cursor"; line: number }
+  | { type: "setLayout"; pageWidth?: number; pageAlign?: PageAlign }
   | { type: "requestFixes"; requestId: string; from: number; to: number }
   | { type: "applyFix"; requestId: string; index: number }
   | { type: "resolveImage"; requestId: string; path: string }

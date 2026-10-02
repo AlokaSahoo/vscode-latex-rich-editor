@@ -231,6 +231,9 @@ body {
   max-width: var(--lr-page-width, none);
   margin: 0 auto;
 }
+.lr-align-left .lv-editor-host .cm-editor {
+  margin-left: 0;
+}
 /* The renderer lays simple figures out as a shrink-to-fit flex column, so an
    image's percentage width (from \linewidth etc.) would resolve against its
    own natural size. Give the wrapper the full line, and center like \centering. */
@@ -386,4 +389,15 @@ math-field::part(virtual-keyboard-toggle) {
 }
 .lr-diag-fixes button:hover {
   background: var(--vscode-button-secondaryHoverBackground, #d5d5d5);
+}
+
+/* Page width / alignment controls at the right end of the toolbar */
+.lv-toolbar-group.lr-layout-group {
+  margin-left: auto;
+  border-right: none !important;
+  padding-right: 0 !important;
+}
+.lv-toolbar button.lr-tb-on {
+  background: var(--vscode-inputOption-activeBackground, rgba(0, 120, 212, 0.18)) !important;
+  color: var(--vscode-inputOption-activeForeground, inherit) !important;
 }

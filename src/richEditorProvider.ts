@@ -9,6 +9,7 @@ import type {
   HostToWebviewMessage,
   ImageKind,
   EditorDiagnostic,
+  PageAlign,
   ProjectData,
   TextChange,
   WebviewToHostMessage,
@@ -43,6 +44,19 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
   /** 0-based line of the cursor in an open rich view (for forward search). */
   public static cursorLine(uri: vscode.Uri): number | undefined {
     return RichEditorProvider.cursors.get(uri.toString());
+  }
+
+  /** Pushes the current page width/alignment settings to every open rich view. */
+  public static broadcastLayout() {
+    for (const open of RichEditorProvider.panels.values()) {
+      if (!open.ready) continue;
+      const config = vscode.workspace.getConfiguration("latexRich", open.document.uri);
+      open.post({
+        type: "layout",
+        pageWidth: config.get<number>("pageWidth", 880),
+        pageAlign: config.get<PageAlign>("pageAlign", "center"),
+      });
+    }
   }
 
   /** Sends all of VS Code's diagnostics for a file (compile errors, spelling, grammar) to its rich view. */
@@ -193,6 +207,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
             text: webviewText,
             customCommands: config.get<Record<string, CustomCommandStyle>>("customCommands", {}),
             pageWidth: config.get<number>("pageWidth", 880),
+            pageAlign: config.get<PageAlign>("pageAlign", "center"),
             showToolbar: config.get<boolean>("showToolbar", true),
             pdfWorkerUrl: webviewPanel.webview
               .asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "dist", "pdf.worker.min.mjs"))
@@ -240,6 +255,9 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
           if (command?.command) await vscode.commands.executeCommand(command.command, ...(command.arguments ?? []));
           break;
         }
+        case "setLayout":
+          await updateLayout(message.pageWidth, message.pageAlign);
+          break;
         case "cursor":
           RichEditorProvider.cursors.set(key, message.line);
           break;
@@ -360,4 +378,11 @@ function getNonce(): string {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
   return text;
+}
+
+/** Saves page width/alignment as user settings; the config listener then updates every open view. */
+export async function updateLayout(pageWidth?: number, pageAlign?: PageAlign) {
+  const config = vscode.workspace.getConfiguration("latexRich");
+  if (pageWidth !== undefined) await config.update("pageWidth", Math.max(0, Math.round(pageWidth)), vscode.ConfigurationTarget.Global);
+  if (pageAlign !== undefined) await config.update("pageAlign", pageAlign, vscode.ConfigurationTarget.Global);
 }

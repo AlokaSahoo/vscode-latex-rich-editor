@@ -20,7 +20,7 @@ import { DualLatexEditor, createImageResolver, imageResolver } from "codemirror-
 import * as pdfjsLib from "pdfjs-dist";
 import "codemirror-visual-markup/dist/styles.css";
 import "./editor.css";
-import { modernizeToolbar } from "./toolbar";
+import { applyLayout, modernizeToolbar, setLayoutSender } from "./toolbar";
 import { followThemeChanges, isDarkTheme, themeExtension } from "./theme";
 import {
   attachEnhancementsToDom,
@@ -151,9 +151,13 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
     (requestId, from, to) => post({ type: "requestFixes", requestId, from, to }),
     (requestId, index) => post({ type: "applyFix", requestId, index }),
   );
-  if (message.pageWidth > 0) {
-    document.documentElement.style.setProperty("--lr-page-width", `${message.pageWidth}px`);
-  }
+  applyLayout(message.pageWidth, message.pageAlign);
+  // Apply immediately, then save as settings (which updates other open views).
+  setLayoutSender((change) => {
+    message = { ...message, ...change };
+    applyLayout(message.pageWidth, message.pageAlign);
+    post({ type: "setLayout", ...change });
+  });
 
   const state = EditorState.create({
     doc: message.text,
@@ -212,6 +216,9 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
       break;
     case "changes":
       applyRemoteChanges(message.changes);
+      break;
+    case "layout":
+      applyLayout(message.pageWidth, message.pageAlign);
       break;
     case "fixes":
       resolveFixes(message.requestId, message.fixes);
