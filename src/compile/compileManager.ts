@@ -2,7 +2,8 @@ import * as vscode from "vscode";
 import { spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import { resolveToolchain, type Toolchain } from "../toolchain";
+import { findRootFile, magicComment } from "../rootFile";
+import { type Engine, resolveToolchain, type Toolchain } from "../toolchain";
 
 export type ProblemKind = "notInstalled" | "wrongArchitecture";
 
@@ -57,10 +58,17 @@ function run(command: string, args: string[], cwd: string, tools: Toolchain, out
 // latexmk needs Perl, which MiKTeX on Windows doesn't ship; this does what it
 // does for a typical paper: pdflatex, BibTeX if the paper cites a .bib, then
 // pdflatex until cross-references stop changing.
-export async function compileWithoutLatexmk(file: string, dir: string, tools: Toolchain, output: vscode.OutputChannel): Promise<RunResult> {
+export async function compileWithoutLatexmk(
+  file: string,
+  dir: string,
+  tools: Toolchain,
+  output: vscode.OutputChannel,
+  engine: Engine = "pdflatex",
+): Promise<RunResult> {
+  const tex = tools[engine] ?? tools.pdflatex!;
   const args = ["-interaction=nonstopmode", "-synctex=1", path.basename(file)];
   const base = path.basename(file, ".tex");
-  let result = await run(tools.pdflatex!, args, dir, tools, output);
+  let result = await run(tex, args, dir, tools, output);
   if (result.error) return result;
   let log = result.log;
 
@@ -71,48 +79,71 @@ export async function compileWithoutLatexmk(file: string, dir: string, tools: To
     log += bib.log;
   }
   for (let pass = 0; pass < 3; pass++) {
-    result = await run(tools.pdflatex!, args, dir, tools, output);
+    result = await run(tex, args, dir, tools, output);
     log += result.log;
     if (!/Rerun to get|Label\(s\) may have changed|Rerun LaTeX/.test(result.log)) break;
   }
   return { ...result, log };
 }
 
+/** The file that actually gets compiled for this document (see rootFile.ts). */
+export function rootOf(document: vscode.TextDocument): string {
+  return document.uri.scheme === "file" ? findRootFile(document.uri.fsPath, document.getText()) : document.uri.fsPath;
+}
+
+export function pdfOf(document: vscode.TextDocument): string {
+  return rootOf(document).replace(/\.tex$/i, ".pdf");
+}
+
+// "% !TEX program = xelatex" wins; otherwise packages that only work with
+// Unicode engines pick xelatex; otherwise the configured default.
+function chooseEngine(rootText: string, configured: string): Engine {
+  const magic = magicComment(rootText, "program")?.toLowerCase();
+  if (magic === "xelatex" || magic === "lualatex" || magic === "pdflatex") return magic;
+  if (configured === "pdflatex" || configured === "xelatex" || configured === "lualatex") return configured;
+  return /\\usepackage\s*(\[[^\]]*\])?\s*\{[^}]*\b(fontspec|unicode-math|polyglossia)\b/.test(rootText) ? "xelatex" : "pdflatex";
+}
+
+const LATEXMK_ENGINE: Record<Engine, string> = { pdflatex: "-pdf", xelatex: "-pdfxe", lualatex: "-pdflua" };
+
 export async function compileDocument(
   document: vscode.TextDocument,
   output: vscode.OutputChannel,
   diagnostics: vscode.DiagnosticCollection,
 ): Promise<CompileResult> {
-  const file = document.uri.fsPath;
+  const file = rootOf(document);
   const dir = path.dirname(file);
-  const pdfPath = path.join(dir, `${path.basename(file, ".tex")}.pdf`);
+  const pdfPath = file.replace(/\.tex$/i, ".pdf");
   const tools = resolveToolchain(true);
+  const rootText = fs.readFileSync(file, "utf8");
+  const engine = chooseEngine(rootText, vscode.workspace.getConfiguration("latexRich", document.uri).get("engine", "auto"));
 
   output.clear();
-  output.appendLine(`Compiling ${file}`);
+  output.appendLine(`Compiling ${file} with ${engine}${file !== document.uri.fsPath ? ` (main file of ${path.basename(document.uri.fsPath)})` : ""}`);
   if (tools.addedToPath) output.appendLine(`(TeX found in ${tools.addedToPath}, which isn't on VS Code's PATH — using it directly)`);
   output.appendLine("");
 
-  if (!tools.pdflatex && !tools.latexmk) return { success: false, pdfPath, problem: "notInstalled" };
+  if (!tools[engine] && !tools.latexmk) return { success: false, pdfPath, problem: "notInstalled" };
 
   let result: RunResult;
+  const args = [LATEXMK_ENGINE[engine], "-interaction=nonstopmode", "-synctex=1", path.basename(file)];
   if (tools.latexmk) {
-    result = await run(tools.latexmk, ["-pdf", "-interaction=nonstopmode", "-synctex=1", path.basename(file)], dir, tools, output);
+    result = await run(tools.latexmk, args, dir, tools, output);
     // latexmk is a Perl script; without Perl it can't run at all — fall back.
     const noPerl = result.error?.code === "ENOENT" || /perl.*(not found|not recognized)|could not find.*perl|script engine/i.test(result.log);
-    if (noPerl && tools.pdflatex) {
-      output.appendLine("\nlatexmk couldn't run (Perl is missing); compiling with pdflatex and BibTeX directly.\n");
-      result = await compileWithoutLatexmk(file, dir, tools, output);
+    if (noPerl && tools[engine]) {
+      output.appendLine(`\nlatexmk couldn't run (Perl is missing); compiling with ${engine} and BibTeX directly.\n`);
+      result = await compileWithoutLatexmk(file, dir, tools, output, engine);
     }
   } else {
-    result = await compileWithoutLatexmk(file, dir, tools, output);
+    result = await compileWithoutLatexmk(file, dir, tools, output, engine);
   }
 
   if (result.error) {
     output.appendLine(`\nFailed to start: ${result.error.message}`);
     return { success: false, pdfPath, problem: toolchainProblem(result.error, result.log) ?? "notInstalled" };
   }
-  updateDiagnostics(document, result.log, diagnostics);
+  updateDiagnostics(file, result.log, diagnostics);
   output.appendLine(`\nFinished with exit code ${result.code}`);
   return {
     success: result.code === 0 && fs.existsSync(pdfPath),
@@ -156,28 +187,28 @@ export async function cleanAuxiliaryFiles(document: vscode.TextDocument): Promis
   return removed;
 }
 
-function updateDiagnostics(
-  document: vscode.TextDocument,
-  log: string,
-  diagnostics: vscode.DiagnosticCollection,
-) {
-  const diags: vscode.Diagnostic[] = [];
-  // Standard LaTeX error format:
-  //   ! <message>
-  //   ...
-  //   l.<line> <context>
-  const errorPattern = /^! (.+)$/gm;
-  let match: RegExpExecArray | null;
-  while ((match = errorPattern.exec(log))) {
-    const message = match[1];
-    const rest = log.slice(match.index);
-    const lineMatch = /\nl\.(\d+)/.exec(rest);
-    const lineNumber = lineMatch
-      ? Math.min(document.lineCount - 1, Math.max(0, parseInt(lineMatch[1], 10) - 1))
-      : 0;
-    diags.push(
-      new vscode.Diagnostic(document.lineAt(lineNumber).range, message, vscode.DiagnosticSeverity.Error),
+// Errors are reported against the file TeX was reading at the time: the last
+// "(./path.tex" opened in the log before the error.
+export function parseErrors(rootFile: string, log: string): Map<string, Array<{ line: number; message: string }>> {
+  const dir = path.dirname(rootFile);
+  const byFile = new Map<string, Array<{ line: number; message: string }>>();
+  for (const m of log.matchAll(/^! (.+)$/gm)) {
+    const before = log.slice(0, m.index);
+    const opened = [...before.matchAll(/\((\.?\.?\/?[^\s()]+\.tex)/g)].pop()?.[1];
+    const file = opened ? path.resolve(dir, opened) : rootFile;
+    const lineMatch = /\nl\.(\d+)/.exec(log.slice(m.index));
+    const entry = { line: lineMatch ? Math.max(0, Number(lineMatch[1]) - 1) : 0, message: m[1] };
+    byFile.set(file, [...(byFile.get(file) ?? []), entry]);
+  }
+  return byFile;
+}
+
+function updateDiagnostics(rootFile: string, log: string, diagnostics: vscode.DiagnosticCollection) {
+  diagnostics.clear();
+  for (const [file, errors] of parseErrors(rootFile, log)) {
+    diagnostics.set(
+      vscode.Uri.file(file),
+      errors.map((e) => new vscode.Diagnostic(new vscode.Range(e.line, 0, e.line, 1000), e.message, vscode.DiagnosticSeverity.Error)),
     );
   }
-  diagnostics.set(document.uri, diags);
 }

@@ -30,13 +30,25 @@ export class PdfPreviewPanel {
     });
   }
 
-  public static show(context: vscode.ExtensionContext, pdfPath: string): void {
+  public static isOpen(): boolean {
+    return !!PdfPreviewPanel.current;
+  }
+
+  public static show(context: vscode.ExtensionContext, pdfPath: string, quiet = false): void {
     if (!PdfPreviewPanel.current) {
       PdfPreviewPanel.current = new PdfPreviewPanel(context, vscode.ViewColumn.Beside);
-    } else {
+    } else if (!quiet) {
       PdfPreviewPanel.current.panel.reveal(vscode.ViewColumn.Beside, true);
     }
     PdfPreviewPanel.current.load(pdfPath);
+  }
+
+  /** Scrolls the preview to a SyncTeX location, opening the PDF if needed. */
+  public static reveal(context: vscode.ExtensionContext, pdfPath: string, location: { page: number; x: number; y: number }) {
+    if (PdfPreviewPanel.current?.pdfPath !== pdfPath) PdfPreviewPanel.show(context, pdfPath);
+    else PdfPreviewPanel.current.panel.reveal(PdfPreviewPanel.current.panel.viewColumn, true);
+    const message: HostToPreviewMessage = { type: "reveal", ...location };
+    PdfPreviewPanel.current!.panel.webview.postMessage(message);
   }
 
   private async inverseSearch(page: number, x: number, y: number) {
@@ -97,6 +109,8 @@ export class PdfPreviewPanel {
     #pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; color: #eee; }
     .pdf-page { max-width: 100%; height: auto; box-shadow: 0 1px 4px rgba(0,0,0,0.5); cursor: text; }
     body.dark-pages { background: #1e1e1e; }
+    .sync-marker { position: absolute; background: rgba(255, 196, 0, 0.35); border-radius: 3px; pointer-events: none; animation: sync-fade 1.6s ease-out forwards; }
+    @keyframes sync-fade { 0%, 40% { opacity: 1; } 100% { opacity: 0; } }
     body.dark-pages .pdf-page { filter: invert(0.88) hue-rotate(180deg); }
     #dark-toggle {
       position: fixed; top: 10px; right: 14px; z-index: 10;

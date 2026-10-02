@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { findRootFile } from "./rootFile";
 import { type BibEntry, bibFiles, findBibitems, findInputs, findLabels, type LabelInfo, parseBib } from "./shared/latexText";
 
 export interface ProjectLabel extends LabelInfo {
@@ -17,7 +18,10 @@ async function readText(uri: vscode.Uri): Promise<string | undefined> {
 
 /** The document plus every file it pulls in with \input/\include, depth-first. */
 export async function projectFiles(document: vscode.TextDocument): Promise<Array<{ uri: vscode.Uri; text: string }>> {
-  const folder = vscode.Uri.joinPath(document.uri, "..");
+  // Start from the main file so a chapter sees the whole project's labels.
+  const rootPath = document.uri.scheme === "file" ? findRootFile(document.uri.fsPath, document.getText()) : undefined;
+  const root = rootPath && rootPath !== document.uri.fsPath ? vscode.Uri.file(rootPath) : document.uri;
+  const folder = vscode.Uri.joinPath(root, "..");
   const files: Array<{ uri: vscode.Uri; text: string }> = [];
   const seen = new Set<string>();
   const visit = async (uri: vscode.Uri, text: string | undefined) => {
@@ -30,7 +34,8 @@ export async function projectFiles(document: vscode.TextDocument): Promise<Array
       await visit(child, await readText(child));
     }
   };
-  await visit(document.uri, document.getText());
+  await visit(root, root === document.uri ? document.getText() : await readText(root));
+  if (!seen.has(document.uri.toString())) await visit(document.uri, document.getText());
   return files;
 }
 
@@ -43,7 +48,8 @@ export async function projectLabels(document: vscode.TextDocument): Promise<Proj
 }
 
 export async function projectBibliography(document: vscode.TextDocument): Promise<BibEntry[]> {
-  const folder = vscode.Uri.joinPath(document.uri, "..");
+  const rootPath = document.uri.scheme === "file" ? findRootFile(document.uri.fsPath, document.getText()) : document.uri.fsPath;
+  const folder = vscode.Uri.joinPath(vscode.Uri.file(rootPath), "..");
   const entries = new Map<string, BibEntry>();
   for (const file of await projectFiles(document)) {
     for (const item of findBibitems(file.text)) entries.set(item.key, item);

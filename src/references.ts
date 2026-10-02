@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import { findRootFile } from "./rootFile";
 import type { ReferenceTable } from "./webview-editor/protocol";
 
 // Reads label numbers and citation labels from the .aux file(s) the last
@@ -6,6 +8,14 @@ import type { ReferenceTable } from "./webview-editor/protocol";
 // the PDF instead of raw keys. Follows \@input{...aux} for \include'd files.
 export async function readReferences(texUri: vscode.Uri): Promise<ReferenceTable> {
   const table: ReferenceTable = { labels: {}, citations: {} };
+  // Numbers live in the main file's .aux when this is an \input'ed chapter.
+  if (texUri.scheme === "file") {
+    try {
+      texUri = vscode.Uri.file(findRootFile(texUri.fsPath, fs.readFileSync(texUri.fsPath, "utf8")));
+    } catch {
+      // unsaved/unreadable: use the file itself
+    }
+  }
   const folder = vscode.Uri.joinPath(texUri, "..");
   const base = texUri.path.slice(texUri.path.lastIndexOf("/") + 1).replace(/\.tex$/i, "");
   await readAux(vscode.Uri.joinPath(folder, `${base}.aux`), folder, table, new Set());

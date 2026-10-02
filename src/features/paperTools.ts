@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { activeTexDocument, commandTexDocument } from "../activeDocument";
 import { buildArxivPackage } from "../arxivPackage";
+import { rootOf } from "../compile/compileManager";
 import { countLength, type LengthReport } from "../lengthCheck";
 import { createZip } from "../zip";
 import { paperSource, STARTER_BIB, TEMPLATES } from "../templates";
@@ -59,7 +60,7 @@ async function prepareArxiv(document: vscode.TextDocument) {
     return;
   }
   await document.save();
-  const mainFile = document.uri.fsPath;
+  const mainFile = rootOf(document);
   const pkg = buildArxivPackage(mainFile);
   const zipPath = mainFile.replace(/\.tex$/i, "-arxiv.zip");
   const zipUri = vscode.Uri.file(zipPath);
@@ -92,7 +93,8 @@ async function prepareArxiv(document: vscode.TextDocument) {
 
 async function showLengthReport(document: vscode.TextDocument, output: vscode.OutputChannel) {
   if (document.uri.scheme !== "file") return;
-  const report = countLength(document.uri.fsPath, document.getText());
+  const root = rootOf(document);
+  const report = countLength(root, root === document.uri.fsPath ? document.getText() : undefined);
   output.clear();
   output.appendLine(formatReport(path.basename(document.uri.fsPath), report));
   const percent = Math.round((report.total / report.limit) * 100);

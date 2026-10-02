@@ -1,5 +1,20 @@
-import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
+import {
+  crosshairCursor,
+  drawSelection,
+  dropCursor,
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  keymap,
+  lineNumbers,
+  rectangularSelection,
+} from "@codemirror/view";
+import { defaultKeymap, indentWithTab } from "@codemirror/commands";
+import { bracketMatching, defaultHighlightStyle, foldGutter, foldKeymap, indentOnInput, syntaxHighlighting } from "@codemirror/language";
+import { closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { latex } from "codemirror-lang-latex";
 import { DualLatexEditor, createImageResolver, imageResolver } from "codemirror-visual-markup";
 import * as pdfjsLib from "pdfjs-dist";
@@ -15,7 +30,8 @@ import {
   setReferences,
   setVisualMode,
 } from "./latexEnhancements";
-import type { HostToWebviewMessage, ImageKind, WebviewToHostMessage } from "./protocol";
+import { errorExtensions, showErrors } from "./errors";
+import type { HostToWebviewMessage, ImageKind, TextChange, WebviewToHostMessage } from "./protocol";
 import { resolveFigures, setFigureUploader, setImageLoader, setProjectData, smartExtensions } from "./smartFeatures";
 
 declare function acquireVsCodeApi(): {
@@ -31,11 +47,36 @@ function post(message: WebviewToHostMessage) {
   vscode.postMessage(message);
 }
 
-let editTimer: ReturnType<typeof setTimeout> | undefined;
-function scheduleEditPost(text: string) {
-  clearTimeout(editTimer);
-  editTimer = setTimeout(() => post({ type: "edit", text }), 150);
-}
+// CodeMirror's basicSetup minus its own undo history: the rich and raw views
+// share one VS Code document, so undo/redo go to VS Code's undo stack.
+const editorSetup = [
+  lineNumbers(),
+  highlightActiveLineGutter(),
+  highlightSpecialChars(),
+  foldGutter(),
+  drawSelection(),
+  dropCursor(),
+  EditorState.allowMultipleSelections.of(true),
+  indentOnInput(),
+  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+  bracketMatching(),
+  closeBrackets(),
+  rectangularSelection(),
+  crosshairCursor(),
+  highlightActiveLine(),
+  highlightSelectionMatches(),
+  keymap.of([
+    { key: "Mod-z", run: () => (post({ type: "undo" }), true), preventDefault: true },
+    { key: "Mod-Shift-z", run: () => (post({ type: "redo" }), true), preventDefault: true },
+    { key: "Mod-y", run: () => (post({ type: "redo" }), true), preventDefault: true },
+    ...closeBracketsKeymap,
+    ...defaultKeymap,
+    ...searchKeymap,
+    ...foldKeymap,
+    ...completionKeymap,
+    indentWithTab,
+  ]),
+];
 
 // Images are relative to the .tex file's own folder; the webview has no
 // filesystem access, so path resolution is offloaded to the extension host,
@@ -80,9 +121,22 @@ async function rasterizePdf(url: string): Promise<string | null> {
   }
 }
 
+// Send only what changed (in pre-change offsets), immediately, so the host
+// applies small edits instead of replacing the whole document.
+let cursorTimer: ReturnType<typeof setTimeout> | undefined;
 const updateListener = EditorView.updateListener.of((update) => {
-  if (!update.docChanged || applyingRemoteUpdate) return;
-  scheduleEditPost(update.state.doc.toString());
+  if (update.docChanged && !applyingRemoteUpdate) {
+    const changes: TextChange[] = [];
+    update.changes.iterChanges((from, to, _fromB, _toB, inserted) => changes.push({ from, to, text: inserted.toString() }));
+    post({ type: "changes", changes, baseLength: update.startState.doc.length });
+  }
+  if (update.selectionSet || update.docChanged) {
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(() => {
+      const line = update.state.doc.lineAt(update.state.selection.main.head).number - 1;
+      post({ type: "cursor", line });
+    }, 200);
+  }
 });
 
 
@@ -100,7 +154,7 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
   const state = EditorState.create({
     doc: message.text,
     extensions: [
-      basicSetup,
+      editorSetup,
       latex({ enableAutocomplete: false }),
       updateListener,
       imageResolver.of(resolver),
@@ -108,6 +162,7 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
       ...enhancementExtensions(),
       ...smartExtensions(),
       themeExtension(),
+      errorExtensions(),
     ],
   });
   view = new EditorView({ state });
@@ -124,6 +179,13 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
   });
   modernizeToolbar(container);
   followThemeChanges(view, (dark) => editor.setTheme(dark ? "dark" : "light"));
+}
+
+function applyRemoteChanges(changes: TextChange[]) {
+  if (!view) return;
+  applyingRemoteUpdate = true;
+  view.dispatch({ changes: changes.map((c) => ({ from: c.from, to: c.to, insert: c.text })) });
+  applyingRemoteUpdate = false;
 }
 
 function applyRemoteText(text: string) {
@@ -143,6 +205,12 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
       break;
     case "update":
       applyRemoteText(message.text);
+      break;
+    case "changes":
+      applyRemoteChanges(message.changes);
+      break;
+    case "diagnostics":
+      if (view) showErrors(view, message.items);
       break;
     case "imageResolved":
       pendingImageResolves.get(message.requestId)?.({ url: message.url, kind: message.kind });

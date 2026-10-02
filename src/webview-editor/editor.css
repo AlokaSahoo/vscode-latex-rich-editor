@@ -346,3 +346,15 @@ math-field::part(virtual-keyboard-toggle) {
     background-color: transparent;
   }
 }
+
+/* Compile errors shown in the rich view (F8 / Shift+F8 to step through) */
+.cm-line.lr-error-line {
+  background: var(--vscode-editorError-background, rgba(255, 0, 0, 0.06));
+}
+.lr-error-text {
+  text-decoration: wavy underline var(--vscode-editorError-foreground, #e51400);
+  text-underline-offset: 3px;
+}
+.lr-error-hover {
+  color: var(--vscode-errorForeground, #e51400);
+}

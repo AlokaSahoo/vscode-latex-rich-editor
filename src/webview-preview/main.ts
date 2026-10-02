@@ -59,6 +59,11 @@ async function renderPdf(url: string, workerUrl: string) {
 
   container.replaceChildren(pages);
   if (document.scrollingElement) document.scrollingElement.scrollTop = scrollTop;
+  if (pendingReveal) {
+    const target = pendingReveal;
+    pendingReveal = undefined;
+    reveal(target);
+  }
 }
 
 // Double-click → source: convert the click to PDF points from the page's
@@ -76,8 +81,34 @@ container.addEventListener("dblclick", (event) => {
   });
 });
 
+// Forward search: scroll the spot into view and flash a marker there.
+let pendingReveal: { page: number; x: number; y: number } | undefined;
+function reveal(target: { page: number; x: number; y: number }) {
+  const canvas = container.querySelector<HTMLCanvasElement>(`canvas.pdf-page[data-page="${target.page}"]`);
+  if (!canvas) {
+    pendingReveal = target;
+    return;
+  }
+  const rect = canvas.getBoundingClientRect();
+  const scale = rect.width / Number(canvas.dataset.widthPt);
+  const top = window.scrollY + rect.top + target.y * scale;
+  window.scrollTo({ top: top - window.innerHeight / 3, behavior: "smooth" });
+  const marker = document.createElement("div");
+  marker.className = "sync-marker";
+  marker.style.top = `${top - 14 * scale}px`;
+  marker.style.left = `${window.scrollX + rect.left}px`;
+  marker.style.width = `${rect.width}px`;
+  marker.style.height = `${18 * scale}px`;
+  document.body.appendChild(marker);
+  setTimeout(() => marker.remove(), 1600);
+}
+
 window.addEventListener("message", (event: MessageEvent<HostToPreviewMessage>) => {
   const message = event.data;
+  if (message.type === "reveal") {
+    reveal(message);
+    return;
+  }
   if (message.type === "load") {
     renderPdf(message.url, message.workerUrl).catch((err) => {
       container.textContent = `Failed to load PDF: ${err instanceof Error ? err.message : String(err)}`;

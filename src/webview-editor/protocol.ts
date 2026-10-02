@@ -10,6 +10,18 @@ export interface ProjectData {
 
 export type ImageKind = "image" | "pdf";
 
+/** A replacement in offsets of the text *before* the whole change set. */
+export interface TextChange {
+  from: number;
+  to: number;
+  text: string;
+}
+
+export interface EditorDiagnostic {
+  line: number; // 0-based
+  message: string;
+}
+
 export interface ReferenceTable {
   labels: Record<string, { number: string; page: string; type?: string }>;
   citations: Record<string, string>;
@@ -27,6 +39,8 @@ export type HostToWebviewMessage =
       project: ProjectData;
     }
   | { type: "update"; text: string }
+  | { type: "changes"; changes: TextChange[] }
+  | { type: "diagnostics"; items: EditorDiagnostic[] }
   | { type: "references"; references: ReferenceTable }
   | { type: "project"; project: ProjectData }
   | { type: "imageResolved"; requestId: string; url: string | null; kind: ImageKind }
@@ -35,7 +49,10 @@ export type HostToWebviewMessage =
 
 export type WebviewToHostMessage =
   | { type: "ready" }
-  | { type: "edit"; text: string }
+  | { type: "changes"; changes: TextChange[]; baseLength: number }
+  | { type: "undo" }
+  | { type: "redo" }
+  | { type: "cursor"; line: number }
   | { type: "resolveImage"; requestId: string; path: string }
   | {
       type: "addFigures";

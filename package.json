@@ -70,6 +70,12 @@
         "icon": "$(open-preview)"
       },
       {
+        "command": "latexRich.syncToPdf",
+        "category": "LaTeX",
+        "title": "Show Cursor Position in PDF",
+        "icon": "$(target)"
+      },
+      {
         "command": "latexRich.clean",
         "category": "LaTeX",
         "title": "Clean Auxiliary Files",
@@ -89,7 +95,7 @@
       {
         "command": "latexRich.newPaper",
         "category": "LaTeX",
-        "title": "New REVTeX Paper…"
+        "title": "New REVTeX Paper\u2026"
       },
       {
         "command": "latexRich.checkSetup",
@@ -129,6 +135,12 @@
         "key": "ctrl+shift+v",
         "mac": "cmd+shift+v",
         "when": "activeCustomEditorId == latexRich.richEditor"
+      },
+      {
+        "command": "latexRich.syncToPdf",
+        "key": "ctrl+alt+j",
+        "mac": "cmd+alt+j",
+        "when": "resourceExtname == .tex"
       }
     ],
     "configuration": {
@@ -137,7 +149,7 @@
         "latexRich.customCommands": {
           "type": "object",
           "default": {},
-          "markdownDescription": "Style LaTeX commands the rich view doesn't recognize (your own macros, package commands). Map a command name (no backslash) to one of: `bold`, `italic`, `underline`, `reference`, `hidden`. Example: `{ \"keyterm\": \"bold\", \"todo\": \"hidden\" }`. Common REVTeX commands (`\\affiliation`, `\\email`, `\\eqref`, `\\onlinecite`, …) are styled already. Applies the next time a file is opened in the rich editor.",
+          "markdownDescription": "Style LaTeX commands the rich view doesn't recognize (your own macros, package commands). Map a command name (no backslash) to one of: `bold`, `italic`, `underline`, `reference`, `hidden`. Example: `{ \"keyterm\": \"bold\", \"todo\": \"hidden\" }`. Common REVTeX commands (`\\affiliation`, `\\email`, `\\eqref`, `\\onlinecite`, \u2026) are styled already. Applies the next time a file is opened in the rich editor.",
           "additionalProperties": {
             "type": "string",
             "enum": [
@@ -159,6 +171,27 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Show the formatting toolbar (bold, headings, math, lists, tables, colors) above the rich view. Applies the next time a file is opened."
+        },
+        "latexRich.compileOnSave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Compile automatically every time a `.tex` or `.bib` file is saved, refreshing the PDF preview if it's open."
+        },
+        "latexRich.engine": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "pdflatex",
+            "xelatex",
+            "lualatex"
+          ],
+          "default": "auto",
+          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = \u2026` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
+        },
+        "latexRich.syncAfterCompile": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "After a successful compile, scroll the PDF preview to the cursor's position."
         }
       }
     },
@@ -198,6 +231,11 @@
           "command": "latexRich.prepareArxiv",
           "when": "resourceExtname == .tex",
           "group": "1_latex@3"
+        },
+        {
+          "command": "latexRich.syncToPdf",
+          "when": "resourceExtname == .tex",
+          "group": "1_latex@0"
         }
       ],
       "commandPalette": [

@@ -147,6 +147,41 @@ export function inverseSearch(data: SyncData, page: number, x: number, y: number
   return { file: data.inputs.get(best.input)!, line: best.line };
 }
 
+export interface PdfLocation {
+  page: number;
+  /** Points from the page's top-left corner. */
+  x: number;
+  y: number;
+}
+
+/**
+ * Source line → PDF position. Takes the records for that file and the
+ * nearest line at or after the requested one (blank lines and preamble have
+ * none), preferring word-level records, and returns the topmost of them.
+ */
+export function forwardSearch(data: SyncData, file: string, line: number): PdfLocation | undefined {
+  const target = path.resolve(file);
+  const tags = [...data.inputs].filter(([, f]) => path.resolve(f) === target).map(([tag]) => tag);
+  if (tags.length === 0) return undefined;
+
+  let best: { page: number; record: SyncRecord } | undefined;
+  for (const [page, records] of data.pages) {
+    for (const record of records) {
+      if (!tags.includes(record.input) || record.line < line) continue;
+      if (
+        !best ||
+        record.line < best.record.line ||
+        (record.line === best.record.line &&
+          (page < best.page || (page === best.page && record.y < best.record.y)))
+      ) {
+        best = { page, record };
+      }
+    }
+  }
+  if (!best) return undefined;
+  return { page: best.page, x: best.record.x, y: best.record.y };
+}
+
 function nearest(records: SyncRecord[], distance: (r: SyncRecord) => number): SyncRecord | undefined {
   let best: SyncRecord | undefined;
   let bestDistance = Infinity;

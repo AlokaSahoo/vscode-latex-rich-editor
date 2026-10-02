@@ -6,9 +6,13 @@ import * as path from "path";
 // standard install locations of MacTeX/TeX Live, TinyTeX and MiKTeX — VS Code
 // launched from the Dock or Start menu often doesn't inherit the shell PATH.
 
+export type Engine = "pdflatex" | "xelatex" | "lualatex";
+
 export interface Toolchain {
   latexmk?: string;
   pdflatex?: string;
+  xelatex?: string;
+  lualatex?: string;
   bibtex?: string;
   /** Environment with the TeX bin folder on PATH, for spawning. */
   env: NodeJS.ProcessEnv;
@@ -88,7 +92,14 @@ export function resolveToolchain(refresh = false): Toolchain {
   const pdflatex = find("pdflatex");
   // Prefer tools from the same installation as pdflatex.
   const sibling = (name: string) => (pdflatex && executable(pdflatex.dir, name)) || find(name)?.file;
-  const toolchain: Toolchain = { pdflatex: pdflatex?.file, latexmk: sibling("latexmk"), bibtex: sibling("bibtex"), env };
+  const toolchain: Toolchain = {
+    pdflatex: pdflatex?.file,
+    xelatex: sibling("xelatex"),
+    lualatex: sibling("lualatex"),
+    latexmk: sibling("latexmk"),
+    bibtex: sibling("bibtex"),
+    env,
+  };
   if (pdflatex && !pdflatex.onPath) {
     env[pathKey] = [pdflatex.dir, ...current].join(path.delimiter);
     toolchain.addedToPath = pdflatex.dir;

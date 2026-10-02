@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { rootOf } from "./compile/compileManager";
 import { placeFigures } from "./figures";
 import { projectBibliography, projectLabels } from "./project";
 import { readReferences } from "./references";
@@ -8,6 +9,7 @@ import type {
   HostToWebviewMessage,
   ImageKind,
   ProjectData,
+  TextChange,
   WebviewToHostMessage,
 } from "./webview-editor/protocol";
 
@@ -34,6 +36,18 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
 
   private static readonly panels = new Map<string, OpenPanel>();
   private static readonly pendingReveals = new Map<string, number>();
+  private static readonly cursors = new Map<string, number>();
+
+  /** 0-based line of the cursor in an open rich view (for forward search). */
+  public static cursorLine(uri: vscode.Uri): number | undefined {
+    return RichEditorProvider.cursors.get(uri.toString());
+  }
+
+  /** Shows compile errors inside the open rich view of each file. */
+  public static showDiagnostics(uri: vscode.Uri, items: Array<{ line: number; message: string }>) {
+    const open = RichEditorProvider.panels.get(uri.toString());
+    if (open?.ready) open.post({ type: "diagnostics", items });
+  }
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -80,11 +94,11 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
     };
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview);
 
-    // Tracks the last text we know the webview holds, so we can skip
-    // redundant "update" posts when a document change originated from the
-    // webview itself (avoids cursor-jumping feedback loops).
-    let lastKnownWebviewText = document.getText();
+    // The text the webview currently holds. Edits flow both ways as small
+    // change sets; if the two sides ever disagree, resend the whole text.
+    let webviewText = document.getText();
     let applyingRemoteEdit = false;
+    let queue: Promise<unknown> = Promise.resolve();
 
     const post = (message: HostToWebviewMessage) => webviewPanel.webview.postMessage(message);
     const key = document.uri.toString();
@@ -93,8 +107,12 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Label/citation numbers come from the .aux file; refresh them whenever a
     // compile rewrites it.
-    const auxName = document.uri.path.slice(document.uri.path.lastIndexOf("/") + 1).replace(/\.tex$/i, ".aux");
-    const auxWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(documentFolder, auxName));
+    // A chapter's numbers are in its main file's .aux.
+    const root = vscode.Uri.file(rootOf(document));
+    const auxName = root.path.slice(root.path.lastIndexOf("/") + 1).replace(/\.tex$/i, ".aux");
+    const auxWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(vscode.Uri.joinPath(root, ".."), auxName),
+    );
     const sendReferences = async () => post({ type: "references", references: await readReferences(document.uri) });
     auxWatcher.onDidChange(sendReferences);
     auxWatcher.onDidCreate(sendReferences);
@@ -109,22 +127,52 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
     sourceWatcher.onDidDelete(sendProject);
 
     const changeSub = vscode.workspace.onDidChangeTextDocument((e) => {
-      if (e.document.uri.toString() !== key) return;
-      if (applyingRemoteEdit) return;
+      if (e.document.uri.toString() !== key || applyingRemoteEdit || e.contentChanges.length === 0) return;
       const text = document.getText();
-      if (text === lastKnownWebviewText) return;
-      lastKnownWebviewText = text;
-      post({ type: "update", text });
+      if (text === webviewText) return;
+      const single = e.contentChanges.length === 1 ? e.contentChanges[0] : undefined;
+      if (single && webviewText.length - single.rangeLength + single.text.length === text.length) {
+        post({ type: "changes", changes: [{ from: single.rangeOffset, to: single.rangeOffset + single.rangeLength, text: single.text }] });
+      } else {
+        post({ type: "update", text });
+      }
+      webviewText = text;
     });
+
+    const applyWebviewChanges = async (changes: TextChange[], baseLength: number) => {
+      const current = document.getText();
+      if (baseLength !== webviewText.length || current !== webviewText) {
+        webviewText = current;
+        post({ type: "update", text: current });
+        return;
+      }
+      let next = webviewText;
+      for (const c of [...changes].sort((a, b) => b.from - a.from)) next = next.slice(0, c.from) + c.text + next.slice(c.to);
+      const edit = new vscode.WorkspaceEdit();
+      for (const c of changes) {
+        edit.replace(document.uri, new vscode.Range(document.positionAt(c.from), document.positionAt(c.to)), c.text);
+      }
+      webviewText = next;
+      applyingRemoteEdit = true;
+      try {
+        await vscode.workspace.applyEdit(edit);
+      } finally {
+        applyingRemoteEdit = false;
+      }
+      if (document.getText() !== webviewText) {
+        webviewText = document.getText();
+        post({ type: "update", text: webviewText });
+      }
+    };
 
     webviewPanel.webview.onDidReceiveMessage(async (message: WebviewToHostMessage) => {
       switch (message.type) {
         case "ready": {
-          lastKnownWebviewText = document.getText();
+          webviewText = document.getText();
           const config = vscode.workspace.getConfiguration("latexRich", document.uri);
           post({
             type: "init",
-            text: lastKnownWebviewText,
+            text: webviewText,
             customCommands: config.get<Record<string, CustomCommandStyle>>("customCommands", {}),
             pageWidth: config.get<number>("pageWidth", 880),
             showToolbar: config.get<boolean>("showToolbar", true),
@@ -135,6 +183,13 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
             project: await projectData(document),
           });
           entry.ready = true;
+          RichEditorProvider.showDiagnostics(
+            document.uri,
+            vscode.languages
+              .getDiagnostics(document.uri)
+              .filter((d) => d.severity === vscode.DiagnosticSeverity.Error)
+              .map((d) => ({ line: d.range.start.line, message: d.message })),
+          );
           const pending = RichEditorProvider.pendingReveals.get(key);
           if (pending !== undefined) {
             RichEditorProvider.pendingReveals.delete(key);
@@ -142,23 +197,18 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
           }
           break;
         }
-        case "edit": {
-          if (message.text === document.getText()) return;
-          lastKnownWebviewText = message.text;
-          const edit = new vscode.WorkspaceEdit();
-          const fullRange = new vscode.Range(
-            document.positionAt(0),
-            document.positionAt(document.getText().length),
-          );
-          edit.replace(document.uri, fullRange, message.text);
-          applyingRemoteEdit = true;
-          try {
-            await vscode.workspace.applyEdit(edit);
-          } finally {
-            applyingRemoteEdit = false;
-          }
+        case "changes": {
+          const { changes, baseLength } = message;
+          queue = queue.then(() => applyWebviewChanges(changes, baseLength));
           break;
         }
+        case "undo":
+        case "redo":
+          queue = queue.then(() => vscode.commands.executeCommand(message.type));
+          break;
+        case "cursor":
+          RichEditorProvider.cursors.set(key, message.line);
+          break;
         case "addFigures": {
           try {
             const { paths, creates } = await placeFigures(document, [
