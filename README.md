@@ -24,21 +24,22 @@ Overleaf-style rich-text (WYSIWYM) editing for `.tex` files in VS Code, with com
 
 ## Getting started
 
-No configuration is needed — there are no build recipes or tool paths to set up. After installing:
+No configuration is needed — there are no build recipes or tool paths to set up. The extension finds TeX by itself:
 
-1. **Check TeX is reachable.** In a terminal, run `latexmk -v`. If it prints a version, you're set. If not, install a TeX distribution (see Installation) and **fully quit and reopen VS Code** so it picks up the new `PATH`.
-2. **Open a `.tex` file** (or run **LaTeX: New REVTeX Paper…** from the Command Palette to start one). It opens in the rich view.
-3. **Click ▶ Compile** in the editor's title bar. The PDF opens beside the editor; double-click anywhere in it to jump to that line of the source.
+- It looks on your `PATH` and in the standard MacTeX / TeX Live / TinyTeX / MiKTeX install folders, so it works even when VS Code was started from the Dock or Start menu and doesn't see your shell's `PATH`.
+- If `latexmk` can't run (e.g. MiKTeX on Windows without Perl), it compiles with `pdflatex` and BibTeX directly.
+- If TeX is missing it offers a **Download** button for your OS; on Apple Silicon with Intel-only TeX it offers **Install Rosetta**.
+- If LaTeX Workshop is installed it offers, once, to turn off LaTeX Workshop's build-on-save so they don't both compile.
 
-That's the whole setup. Everything else (settings, raw view, length check, arXiv package) is optional.
+So after installing: open a `.tex` file (or **LaTeX: New REVTeX Paper…**) and click ▶ **Compile**. **LaTeX: Check Setup** shows what was found.
 
 ### Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| "latexmk was not found on your PATH" | Install TeX, then quit and reopen VS Code. On macOS, MacTeX installs to `/Library/TeX/texbin`; run `eval "$(/usr/libexec/path_helper)"` in a terminal or log out and back in if `latexmk -v` still fails. |
+| "No TeX installation was found" | Click **Download** in the message, install, then compile again. |
 | "TeX binaries are built for a different CPU" (Apple Silicon) | Run `softwareupdate --install-rosetta --agree-to-license`, or switch to MacTeX, which is native. |
-| Windows: compile fails immediately with MiKTeX | MiKTeX's `latexmk` needs Perl — install [Strawberry Perl](https://strawberryperl.com/) and restart VS Code. In MiKTeX Console, allow installing missing packages on the fly. |
+| Windows: MiKTeX asks to install packages | In MiKTeX Console → Settings, set "Install missing packages" to **Always**. |
 | Compile errors | They appear in the Problems panel (`⌘⇧M` / `Ctrl+Shift+M`); the full log is in Output → **LaTeX Rich Editor**. |
 | `\ref`/`\cite` show keys instead of numbers | Compile once — the numbers come from the `.aux` file the compile writes. |
 | Double-clicking the PDF does nothing | Compile again after **Clean Auxiliary Files**; the jump needs the `.synctex.gz` file. |
@@ -90,7 +91,7 @@ One `.vsix` file works on macOS, Windows and Linux — no Node or npm needed to 
    - **In VS Code:** Extensions view (`⌘⇧X` / `Ctrl+Shift+X`) → `…` menu at the top → **Install from VSIX…** → pick the file, or
    - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.0.vsix`
 3. Reload VS Code. `.tex` files now open in the rich view.
-4. For compiling, install a TeX distribution with `latexmk`: [MacTeX](https://tug.org/mactex/) on macOS, [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/) on Windows (MiKTeX's `latexmk` also needs [Strawberry Perl](https://strawberryperl.com/)), TeX Live on Linux (e.g. `sudo apt install texlive-full latexmk`).
+4. For compiling, install a TeX distribution with `latexmk`: [MacTeX](https://tug.org/mactex/) on macOS, [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/) on Windows, TeX Live on Linux (e.g. `sudo apt install texlive-full latexmk`).
 
 To update, install the newer `.vsix` the same way.
 

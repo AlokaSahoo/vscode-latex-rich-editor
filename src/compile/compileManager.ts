@@ -1,23 +1,22 @@
 import * as vscode from "vscode";
 import { spawn } from "child_process";
+import * as fs from "fs";
 import * as path from "path";
+import { resolveToolchain, type Toolchain } from "../toolchain";
+
+export type ProblemKind = "notInstalled" | "wrongArchitecture";
 
 export interface CompileResult {
   success: boolean;
   pdfPath: string;
   /** Set when the TeX toolchain itself couldn't run, as opposed to a LaTeX error. */
-  problem?: string;
+  problem?: ProblemKind;
 }
 
-const NOT_INSTALLED =
-  "latexmk was not found on your PATH. Install a TeX distribution (TeX Live, MacTeX or MiKTeX) and restart VS Code.";
-const WRONG_ARCHITECTURE =
-  "Your TeX binaries are built for a different CPU (e.g. Intel builds on Apple Silicon without Rosetta). Install Rosetta (`softwareupdate --install-rosetta`) or a native TeX distribution such as MacTeX.";
-
-function toolchainProblem(error: NodeJS.ErrnoException | undefined, log: string): string | undefined {
-  if (error?.code === "ENOENT") return NOT_INSTALLED;
+function toolchainProblem(error: NodeJS.ErrnoException | undefined, log: string): ProblemKind | undefined {
+  if (error?.code === "ENOENT") return "notInstalled";
   // macOS reports a wrong-architecture binary as errno 86 (EBADARCH).
-  if (error?.errno === -86 || /bad CPU type/i.test(log)) return WRONG_ARCHITECTURE;
+  if (error?.errno === -86 || /bad CPU type/i.test(log)) return "wrongArchitecture";
   return undefined;
 }
 
@@ -25,57 +24,101 @@ export function createOutputChannel(): vscode.OutputChannel {
   return vscode.window.createOutputChannel("LaTeX Rich Editor");
 }
 
-export function compileDocument(
-  document: vscode.TextDocument,
-  outputChannel: vscode.OutputChannel,
-  diagnostics: vscode.DiagnosticCollection,
-): Promise<CompileResult> {
+interface RunResult {
+  code: number | null;
+  log: string;
+  error?: NodeJS.ErrnoException;
+}
+
+function run(command: string, args: string[], cwd: string, tools: Toolchain, output: vscode.OutputChannel): Promise<RunResult> {
   return new Promise((resolve) => {
-    const filePath = document.uri.fsPath;
-    const dir = path.dirname(filePath);
-    const base = path.basename(filePath, ".tex");
-    const pdfPath = path.join(dir, `${base}.pdf`);
-
-    outputChannel.clear();
-    outputChannel.appendLine(`Compiling ${filePath}...\n`);
-
+    output.appendLine(`$ ${path.basename(command)} ${args.join(" ")}`);
     let proc: ReturnType<typeof spawn>;
     try {
-      proc = spawn("latexmk", ["-pdf", "-interaction=nonstopmode", "-synctex=1", path.basename(filePath)], {
-        cwd: dir,
-      });
+      proc = spawn(command, args, { cwd, env: tools.env, shell: /\.(bat|cmd)$/i.test(command) });
     } catch (err) {
-      // Some failures (e.g. a wrong-architecture binary) throw synchronously
-      // instead of emitting "error".
-      const error = err as NodeJS.ErrnoException;
-      outputChannel.appendLine(`Failed to start latexmk: ${error.message}`);
-      resolve({ success: false, pdfPath, problem: toolchainProblem(error, "") ?? error.message });
+      // Some failures (e.g. a wrong-architecture binary) throw synchronously.
+      resolve({ code: null, log: "", error: err as NodeJS.ErrnoException });
       return;
     }
-
     let log = "";
-    proc.stdout?.on("data", (data) => {
+    const collect = (data: Buffer) => {
       const text = data.toString();
       log += text;
-      outputChannel.append(text);
-    });
-    proc.stderr?.on("data", (data) => {
-      const text = data.toString();
-      log += text;
-      outputChannel.append(text);
-    });
-
-    proc.on("error", (err: NodeJS.ErrnoException) => {
-      outputChannel.appendLine(`\nFailed to start latexmk: ${err.message}`);
-      resolve({ success: false, pdfPath, problem: toolchainProblem(err, log) });
-    });
-
-    proc.on("close", (code) => {
-      updateDiagnostics(document, log, diagnostics);
-      outputChannel.appendLine(`\nlatexmk exited with code ${code}`);
-      resolve({ success: code === 0, pdfPath, problem: code === 0 ? undefined : toolchainProblem(undefined, log) });
-    });
+      output.append(text);
+    };
+    proc.stdout?.on("data", collect);
+    proc.stderr?.on("data", collect);
+    proc.on("error", (error: NodeJS.ErrnoException) => resolve({ code: null, log, error }));
+    proc.on("close", (code) => resolve({ code, log }));
   });
+}
+
+// latexmk needs Perl, which MiKTeX on Windows doesn't ship; this does what it
+// does for a typical paper: pdflatex, BibTeX if the paper cites a .bib, then
+// pdflatex until cross-references stop changing.
+export async function compileWithoutLatexmk(file: string, dir: string, tools: Toolchain, output: vscode.OutputChannel): Promise<RunResult> {
+  const args = ["-interaction=nonstopmode", "-synctex=1", path.basename(file)];
+  const base = path.basename(file, ".tex");
+  let result = await run(tools.pdflatex!, args, dir, tools, output);
+  if (result.error) return result;
+  let log = result.log;
+
+  const aux = path.join(dir, `${base}.aux`);
+  const auxText = fs.existsSync(aux) ? fs.readFileSync(aux, "utf8") : "";
+  if (tools.bibtex && /\\bibdata\{/.test(auxText)) {
+    const bib = await run(tools.bibtex, [base], dir, tools, output);
+    log += bib.log;
+  }
+  for (let pass = 0; pass < 3; pass++) {
+    result = await run(tools.pdflatex!, args, dir, tools, output);
+    log += result.log;
+    if (!/Rerun to get|Label\(s\) may have changed|Rerun LaTeX/.test(result.log)) break;
+  }
+  return { ...result, log };
+}
+
+export async function compileDocument(
+  document: vscode.TextDocument,
+  output: vscode.OutputChannel,
+  diagnostics: vscode.DiagnosticCollection,
+): Promise<CompileResult> {
+  const file = document.uri.fsPath;
+  const dir = path.dirname(file);
+  const pdfPath = path.join(dir, `${path.basename(file, ".tex")}.pdf`);
+  const tools = resolveToolchain(true);
+
+  output.clear();
+  output.appendLine(`Compiling ${file}`);
+  if (tools.addedToPath) output.appendLine(`(TeX found in ${tools.addedToPath}, which isn't on VS Code's PATH — using it directly)`);
+  output.appendLine("");
+
+  if (!tools.pdflatex && !tools.latexmk) return { success: false, pdfPath, problem: "notInstalled" };
+
+  let result: RunResult;
+  if (tools.latexmk) {
+    result = await run(tools.latexmk, ["-pdf", "-interaction=nonstopmode", "-synctex=1", path.basename(file)], dir, tools, output);
+    // latexmk is a Perl script; without Perl it can't run at all — fall back.
+    const noPerl = result.error?.code === "ENOENT" || /perl.*(not found|not recognized)|could not find.*perl|script engine/i.test(result.log);
+    if (noPerl && tools.pdflatex) {
+      output.appendLine("\nlatexmk couldn't run (Perl is missing); compiling with pdflatex and BibTeX directly.\n");
+      result = await compileWithoutLatexmk(file, dir, tools, output);
+    }
+  } else {
+    result = await compileWithoutLatexmk(file, dir, tools, output);
+  }
+
+  if (result.error) {
+    output.appendLine(`\nFailed to start: ${result.error.message}`);
+    return { success: false, pdfPath, problem: toolchainProblem(result.error, result.log) ?? "notInstalled" };
+  }
+  updateDiagnostics(document, result.log, diagnostics);
+  output.appendLine(`\nFinished with exit code ${result.code}`);
+  return {
+    success: result.code === 0 && fs.existsSync(pdfPath),
+    pdfPath,
+    problem: result.code === 0 ? undefined : toolchainProblem(undefined, result.log),
+  };
 }
 
 const AUXILIARY_EXTENSIONS = [

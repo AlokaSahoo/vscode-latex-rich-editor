@@ -6,6 +6,7 @@ import { cleanAuxiliaryFiles, compileDocument, createOutputChannel } from "./com
 import { registerLanguageFeatures } from "./features/languageFeatures";
 import { registerOutlineView } from "./features/outlineView";
 import { registerPaperTools } from "./features/paperTools";
+import { offerFix, registerSetup } from "./features/setup";
 import { PdfPreviewPanel } from "./preview/pdfPreviewPanel";
 
 export function activate(context: vscode.ExtensionContext) {
@@ -18,16 +19,21 @@ export function activate(context: vscode.ExtensionContext) {
   registerLanguageFeatures(context);
   registerOutlineView(context);
   registerPaperTools(context, outputChannel);
+  registerSetup(context);
 
   const compileAndPreview = async (document: vscode.TextDocument) => {
     await document.save();
     const result = await compileDocument(document, outputChannel, diagnostics);
     if (result.success) {
       PdfPreviewPanel.show(context, result.pdfPath);
+    } else if (result.problem) {
+      await offerFix(result.problem);
     } else {
-      vscode.window.showErrorMessage(
-        result.problem ?? "LaTeX compile failed. See the LaTeX Rich Editor output panel for details.",
+      const choice = await vscode.window.showErrorMessage(
+        "LaTeX compile failed — the errors are listed in the Problems panel.",
+        "Show Log",
       );
+      if (choice) outputChannel.show(true);
     }
   };
 

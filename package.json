@@ -92,6 +92,11 @@
         "title": "New REVTeX Paper…"
       },
       {
+        "command": "latexRich.checkSetup",
+        "category": "LaTeX",
+        "title": "Check Setup"
+      },
+      {
         "command": "latexRich.revealLine",
         "category": "LaTeX",
         "title": "Go to Line"
