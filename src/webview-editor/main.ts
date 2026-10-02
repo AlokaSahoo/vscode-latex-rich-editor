@@ -19,6 +19,10 @@ import { latex } from "codemirror-lang-latex";
 import { DualLatexEditor, createImageResolver, imageResolver } from "codemirror-visual-markup";
 import * as pdfjsLib from "pdfjs-dist";
 import "codemirror-visual-markup/dist/styles.css";
+// Math fonts declared in CSS (and MathLive told so) instead of MathLive
+// fetching them at runtime relative to its script URL, which fails in VS Code
+// webviews and left \mathcal, \mathbb, \mathfrak… as plain letters.
+import "mathlive/fonts.css";
 import "./editor.css";
 import { applyLayout, modernizeToolbar, setLayoutSender } from "./toolbar";
 import { followThemeChanges, isDarkTheme, themeExtension } from "./theme";

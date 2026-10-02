@@ -3,7 +3,7 @@ src/**
 node_modules/**
 sample/**
 patches/**
-images/*.svg
+images/icon.svg
 esbuild.js
 tsconfig.json
 *.map

@@ -4,6 +4,7 @@ import { activeTexDocument, commandTexDocument, tabUri } from "./activeDocument"
 import { RichEditorProvider, updateLayout } from "./richEditorProvider";
 import { cleanAuxiliaryFiles, compileDocument, createOutputChannel, pdfOf } from "./compile/compileManager";
 import { registerLanguageFeatures } from "./features/languageFeatures";
+import { registerActionsView } from "./features/actionsView";
 import { registerOutlineView } from "./features/outlineView";
 import { registerPaperTools } from "./features/paperTools";
 import { offerFix, registerSetup } from "./features/setup";
@@ -19,6 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   registerLanguageFeatures(context);
   registerOutlineView(context);
+  registerActionsView(context);
   registerPaperTools(context, outputChannel);
   registerSetup(context);
 

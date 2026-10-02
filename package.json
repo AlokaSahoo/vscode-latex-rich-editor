@@ -2,7 +2,7 @@
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
   "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
   "icon": "images/icon.png",
@@ -129,11 +129,14 @@
       }
     ],
     "views": {
-      "explorer": [
+      "latexRich": [
+        {
+          "id": "latexRich.actions",
+          "name": "Actions"
+        },
         {
           "id": "latexRich.outline",
-          "name": "LaTeX Outline",
-          "when": "latexRich.hasTexDocument"
+          "name": "Outline"
         }
       ]
     },
@@ -304,7 +307,22 @@
           "when": "activeCustomEditorId == latexRich.richEditor"
         }
       ]
-    }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "latexRich",
+          "title": "LaTeX",
+          "icon": "images/activitybar.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "latexRich.outline",
+        "contents": "Open a .tex file to see its sections, figures, tables and equations.\n[New REVTeX Paper](command:latexRich.newPaper)"
+      }
+    ]
   },
   "scripts": {
     "postinstall": "patch-package",

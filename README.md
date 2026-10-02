@@ -14,7 +14,7 @@ Overleaf-style rich-text (WYSIWYM) editing for `.tex` files in VS Code, with com
 - **Autocomplete for keys** — type `\ref{`, `\eqref{` or `\cite{` and pick from your labels (shown as "Figure 2", "Equation (3)" with the caption or formula) and your bibliography (`.bib` files and `thebibliography`), in both the rich and the raw editor.
 - **Hover previews** — hover a `\ref`/`\eqref` to see the equation rendered or the figure with its caption; hover a `\cite` to see the reference.
 - **Paste or drop images** — paste a screenshot or drop a PNG/PDF (hold <kbd>Shift</kbd> while dropping, as VS Code requires) and it's saved under `figures/` with a complete `figure` environment inserted, cursor in the caption. Images already inside the paper's folder are referenced in place, not copied.
-- **LaTeX Outline** in the Explorer — sections, figures, tables and equations with their labels; click to jump. The raw editor also gets the standard Outline view and breadcrumbs.
+- **LaTeX sidebar** — a LaTeX icon in the Activity Bar (left edge) opens **Actions** (compile, PDF preview, word count, arXiv, clean, new paper, setup check — one click each) and the **Outline**: sections, figures, tables and equations with their labels; click to jump. The raw editor also gets the standard Outline view and breadcrumbs.
 - **Prepare arXiv Submission** — one command builds `<paper>-arxiv.zip`: sources with comments removed, only the figures actually used, the `.bbl` (arXiv doesn't run BibTeX) and any local `.cls`/`.sty`/`.bst`, with warnings for anything missing.
 - **PRL length check** — counts the way the [APS length guide](https://journals.aps.org/authors/length-guide) does: text, captions and footnotes, plus 16 words per displayed-equation row (32 if two-column), 150/aspect + 20 per figure (300/(0.5·aspect) + 40 for `figure*`, aspect read from the image file), and 13 + 6.5/line per table. Title, authors, abstract, acknowledgments and references are excluded. Every REVTeX paper shows a live count in the status bar (bottom right; red when over the limit — click it for the breakdown), counting the whole paper even when you're editing an `\\input` chapter.
 - **New REVTeX Paper** — starts a PRL, PRB, PRX or single-column preprint with a starter `references.bib` and a `figures/` folder.
@@ -86,10 +86,10 @@ A TeX distribution with `latexmk` on your `PATH` (TeX Live, MacTeX or MiKTeX). R
 
 One `.vsix` file works on macOS, Windows and Linux — no Node or npm needed to install it.
 
-1. Download `latex-rich-editor-v0.1.4.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
+1. Download `latex-rich-editor-v0.1.5.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
 2. Install it, either:
    - **In VS Code:** Extensions view (`⌘⇧X` / `Ctrl+Shift+X`) → `…` menu at the top → **Install from VSIX…** → pick the file, or
-   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.4.vsix`
+   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.5.vsix`
 3. Reload VS Code. `.tex` files now open in the rich view.
 4. For compiling, install a TeX distribution with `latexmk`: [MacTeX](https://tug.org/mactex/) on macOS, [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/) on Windows, TeX Live on Linux (e.g. `sudo apt install texlive-full latexmk`).
 

@@ -5,18 +5,6 @@ const path = require("path");
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
 
-// MathLive resolves its font files relative to its own script URL at
-// runtime (via document.currentScript), so the KaTeX fonts it needs must
-// live in a "fonts" folder next to the bundled webview script.
-function copyMathliveFonts() {
-  const src = path.join(__dirname, "node_modules", "mathlive", "fonts");
-  const dest = path.join(__dirname, "dist", "fonts");
-  fs.mkdirSync(dest, { recursive: true });
-  for (const file of fs.readdirSync(src)) {
-    fs.copyFileSync(path.join(src, file), path.join(dest, file));
-  }
-}
-
 // pdf.js loads its worker as a separate script by URL at runtime, not via
 // a JS import, so it must be copied alongside the bundled webview script.
 function copyPdfWorker() {
@@ -50,7 +38,7 @@ const webviewEditorConfig = {
   sourcemap: false,
   minify: production,
   // VS Code's icon font, referenced from codicon.css
-  loader: { ".ttf": "file" },
+  loader: { ".ttf": "file", ".woff2": "file" },
 };
 
 /** @type {import('esbuild').BuildOptions} */
@@ -67,7 +55,6 @@ const webviewPreviewConfig = {
 
 async function run() {
   const configs = [extensionConfig, webviewEditorConfig, webviewPreviewConfig];
-  copyMathliveFonts();
   copyPdfWorker();
   if (watch) {
     const contexts = await Promise.all(configs.map((c) => esbuild.context(c)));
