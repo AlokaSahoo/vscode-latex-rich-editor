@@ -83,6 +83,12 @@ describe("findLabels", () => {
   it("records the line", () => {
     expect(labels["eq:a"].line).toBe(1);
   });
+  it("attaches a label inside a heading, or right after it, to that heading", () => {
+    const [inside, after, far] = findLabels("\\section{A \\label{in}}\n\\section{B}\\label{after}\ntext\n\\label{far}");
+    expect(inside).toMatchObject({ kind: "section", context: "A" });
+    expect(after).toMatchObject({ kind: "section", context: "B" });
+    expect(far.kind).toBe("other");
+  });
   it("ignores commented labels", () => {
     expect(findLabels("% \\label{x}")).toEqual([]);
   });

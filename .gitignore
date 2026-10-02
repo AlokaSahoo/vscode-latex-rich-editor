@@ -13,3 +13,5 @@ sample/*.blg
 sample/*Notes.bib
 sample/*.out
 sample/*.synctex(busy)
+bench/*.tex
+bench/host.js

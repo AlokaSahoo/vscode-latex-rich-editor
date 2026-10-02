@@ -1,5 +1,5 @@
 diff --git a/node_modules/codemirror-visual-markup/dist/index.js b/node_modules/codemirror-visual-markup/dist/index.js
-index 564e918..6d5b4a9 100644
+index 564e918..89ffc86 100644
 --- a/node_modules/codemirror-visual-markup/dist/index.js
 +++ b/node_modules/codemirror-visual-markup/dist/index.js
 @@ -137,12 +137,12 @@ function matchFenced(source, pos, open, close) {
@@ -17,7 +17,96 @@ index 564e918..6d5b4a9 100644
          cursor++;
      }
      return null;
-@@ -3347,6 +3347,15 @@ class MathWidget extends WidgetType {
+@@ -2523,6 +2523,7 @@ function merge$1(base, updates) {
+ }
+ 
+ const DEFAULT_MAX_DEPTH = 12;
++const LATEX_TRIGGER = /[%$\\]/g;
+ class Tokenizer {
+     constructor(language, options = {}) {
+         this.language = language;
+@@ -2550,7 +2551,14 @@ class Tokenizer {
+         while (pos < to) {
+             const token = this.matchAt(source, pos, to, context);
+             if (!token) {
+-                pos++;
++                if (this.language.id === 'latex') {
++                    // Every LaTeX rule starts with %, $ or \, so jump to the next one.
++                    LATEX_TRIGGER.lastIndex = pos + 1;
++                    const next = LATEX_TRIGGER.exec(source);
++                    pos = next && next.index < to ? next.index : to;
++                }
++                else
++                    pos++;
+                 continue;
+             }
+             flushText(token.from);
+@@ -2833,9 +2841,24 @@ class MarkerWidget extends WidgetType {
+         return element;
+     }
+ }
++// Moving the cursor changes no tokens, so keep the last tokenization per document.
++let tokenCache = null;
++let tableMarks = [];
+ function buildDecorations(state, options) {
+-    const source = state.doc.toString();
+-    const tokens = new Tokenizer(options.language, { maxDepth: options.maxDepth }).tokenize(source);
++    let cached = tokenCache;
++    if (!cached || cached.doc !== state.doc || cached.language !== options.language || cached.maxDepth !== options.maxDepth) {
++        const text = state.doc.toString();
++        cached = {
++            doc: state.doc,
++            language: options.language,
++            maxDepth: options.maxDepth,
++            source: text,
++            tokens: new Tokenizer(options.language, { maxDepth: options.maxDepth }).tokenize(text)
++        };
++        tokenCache = cached;
++    }
++    const source = cached.source;
++    const tokens = cached.tokens;
+     const decorations = [];
+     const atomic = [];
+     const replaced = [];
+@@ -2927,6 +2950,10 @@ function buildDecorations(state, options) {
+             decorations.push(Decoration.line({ class: 'cm-lv-syntax-line' }).range(line.from));
+         }
+     }
++    // Table layout marks tokens while building; undo that so the cached tokens stay pristine.
++    for (let i = tableMarks.length - 1; i >= 0; i--)
++        tableMarks[i][0].meta = tableMarks[i][1];
++    tableMarks = [];
+     return {
+         decorations: Decoration.set(decorations, true),
+         atomic: RangeSet.of(atomic, true),
+@@ -3156,6 +3183,7 @@ function markTableWidgets(language, tokens, range) {
+         if (token.to <= range.from || token.from >= range.to)
+             continue;
+         if (token.from >= range.from && token.to <= range.to && language.style(token)?.widget) {
++            tableMarks.push([token, token.meta]);
+             token.meta = { ...token.meta, tableInline: 'true' };
+         }
+         markTableWidgets(language, token.children, range);
+@@ -3218,12 +3246,15 @@ function merge(ranges) {
+     return merged;
+ }
+ function subtract(ranges, holes) {
++    // Both lists are sorted and disjoint (see merge), so sweep them together.
+     const result = [];
++    let first = 0;
+     for (const range of ranges) {
+         let start = range.from;
+-        for (const hole of holes) {
+-            if (hole.to <= start || hole.from >= range.to)
+-                continue;
++        while (first < holes.length && holes[first].to <= start)
++            first++;
++        for (let i = first; i < holes.length && holes[i].from < range.to; i++) {
++            const hole = holes[i];
+             if (hole.from > start)
+                 result.push({ from: start, to: hole.from });
+             start = Math.max(start, hole.to);
+@@ -3347,6 +3378,15 @@ class MathWidget extends WidgetType {
          this.close = token.meta?.close ?? '$';
          this.syntax = context.language.id === 'typst' ? 'typst' : 'latex';
          this.table = tablePresentation(token);
@@ -33,7 +122,7 @@ index 564e918..6d5b4a9 100644
      }
      eq(other) {
          return (other instanceof MathWidget &&
-@@ -3360,6 +3369,9 @@ class MathWidget extends WidgetType {
+@@ -3360,6 +3400,9 @@ class MathWidget extends WidgetType {
          applyTablePresentation(container, this.table);
          const field = () => container.firstElementChild;
          const commit = () => {
@@ -43,7 +132,7 @@ index 564e918..6d5b4a9 100644
              const element = field();
              if (!element || element.value === undefined)
                  return;
-@@ -3370,6 +3382,8 @@ class MathWidget extends WidgetType {
+@@ -3370,6 +3413,8 @@ class MathWidget extends WidgetType {
              replaceRange(view, container, this.text, `${this.open}${content}${this.close}`);
          };
          container.addEventListener('click', event => {

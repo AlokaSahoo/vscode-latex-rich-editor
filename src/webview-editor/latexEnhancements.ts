@@ -389,6 +389,9 @@ function parseKeyValues(text: string): Map<string, string> {
 
 let environmentSource = "";
 let environmentEvents: Array<{ at: number; begin: boolean; name: string }> = [];
+// Images are asked about in document order, so resume the environment walk
+// where the previous call stopped instead of replaying it from the top.
+let walk = { position: 0, index: 0, stack: [] as string[] };
 
 function layoutContext(source: string, position: number): LayoutContext {
   if (source !== environmentSource) {
@@ -398,16 +401,19 @@ function layoutContext(source: string, position: number): LayoutContext {
       begin: m[1] === "begin",
       name: m[2].trim(),
     }));
+    walk = { position: 0, index: 0, stack: [] };
   }
-  const stack: string[] = [];
-  for (const event of environmentEvents) {
-    if (event.at >= position) break;
+  if (position < walk.position) walk = { position: 0, index: 0, stack: [] };
+  const { stack } = walk;
+  while (walk.index < environmentEvents.length && environmentEvents[walk.index].at < position) {
+    const event = environmentEvents[walk.index++];
     if (event.begin) stack.push(event.name);
     else {
       const index = stack.lastIndexOf(event.name);
       if (index >= 0) stack.splice(index);
     }
   }
+  walk.position = position;
   if (stack.some((name) => PANEL_ENVIRONMENTS.has(name))) return "panel";
   if (stack.some((name) => /^(figure|table)\*$/.test(name))) return "wide";
   return info.twoColumn ? "column" : "text";
@@ -633,18 +639,37 @@ class ReferenceWidget extends WidgetType {
   }
 }
 
+interface ResolvedReference {
+  from: number;
+  to: number;
+  label: string;
+  source: string;
+}
+
+// Resolving every \ref/\cite is the expensive part and doesn't depend on the
+// cursor, so it's redone only when the text or the .aux numbers change.
+let resolvedFor: { doc: unknown; table: ReferenceTable } | undefined;
+let resolved: ResolvedReference[] = [];
+
+function resolvedReferences(view: EditorView): ResolvedReference[] {
+  const doc = view.state.doc;
+  if (resolvedFor?.doc === doc && resolvedFor.table === references) return resolved;
+  resolvedFor = { doc, table: references };
+  resolved = [];
+  for (const m of doc.toString().matchAll(REFERENCE)) {
+    const label = formatReference(m[1], m[2]);
+    if (label) resolved.push({ from: m.index!, to: m.index! + m[0].length, label, source: m[0] });
+  }
+  return resolved;
+}
+
 function referenceDecorations(view: EditorView): DecorationSet {
   if (!visualMode) return Decoration.none;
-  const text = view.state.doc.toString();
   const selection = view.state.selection.ranges;
   const builder = new RangeSetBuilder<Decoration>();
-  REFERENCE.lastIndex = 0;
-  for (const m of text.matchAll(REFERENCE)) {
-    const from = m.index!;
-    const to = from + m[0].length;
-    if (selection.some((range) => range.from <= to && range.to >= from)) continue;
-    const label = formatReference(m[1], m[2]);
-    if (label) builder.add(from, to, Decoration.replace({ widget: new ReferenceWidget(label, m[0]) }));
+  for (const ref of resolvedReferences(view)) {
+    if (selection.some((range) => range.from <= ref.to && range.to >= ref.from)) continue;
+    builder.add(ref.from, ref.to, Decoration.replace({ widget: new ReferenceWidget(ref.label, ref.source) }));
   }
   return builder.finish();
 }
@@ -711,35 +736,79 @@ function protectedRanges(masked: string): Array<[number, number]> {
   return ranges;
 }
 
-function symbolDecorations(view: EditorView): DecorationSet {
-  if (!visualMode) return Decoration.none;
-  const text = view.state.doc.toString();
-  const masked = maskComments(text);
-  const skip = protectedRanges(masked);
-  const selection = view.state.selection.ranges;
-  const touches = (from: number, to: number) =>
-    selection.some((r) => r.from <= to && r.to >= from) || skip.some(([a, b]) => from < b && to > a);
+interface SymbolCandidate {
+  from: number;
+  to: number;
+  text: string;
+  /** The cursor revealing the source: anything touching this range shows raw LaTeX. */
+  guardFrom: number;
+  guardTo: number;
+}
 
-  const found: Array<{ from: number; to: number; text: string }> = [];
+/** Whether [from, to) overlaps any of the sorted, disjoint ranges. */
+function overlapsAny(ranges: Array<[number, number]>, from: number, to: number): boolean {
+  let lo = 0;
+  let hi = ranges.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ranges[mid][1] <= from) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo < ranges.length && ranges[lo][0] < to;
+}
+
+function mergeRanges(ranges: Array<[number, number]>): Array<[number, number]> {
+  const merged: Array<[number, number]> = [];
+  for (const [a, b] of [...ranges].sort((x, y) => x[0] - y[0])) {
+    const last = merged[merged.length - 1];
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    else merged.push([a, b]);
+  }
+  return merged;
+}
+
+let symbolsFor: unknown;
+let symbolCandidates: SymbolCandidate[] = [];
+
+// Finding the symbols is the expensive part and doesn't depend on the cursor;
+// only which of them are revealed does, so that is filtered per selection.
+function symbolsOf(view: EditorView): SymbolCandidate[] {
+  const doc = view.state.doc;
+  if (symbolsFor === doc) return symbolCandidates;
+  symbolsFor = doc;
+  const masked = maskComments(doc.toString());
+  const skip = mergeRanges(protectedRanges(masked));
+
+  const found: SymbolCandidate[] = [];
   for (const m of masked.matchAll(SYMBOL)) {
     const from = m.index!;
     const to = from + m[0].length;
     if (m[0] === "~" && masked[from - 1] === "\\") continue; // \~ accent
-    if (touches(from, to)) continue;
-    found.push({ from, to, text: m[1] ?? SYMBOL_TEXT[m[0]] });
+    if (overlapsAny(skip, from, to)) continue;
+    found.push({ from, to, text: m[1] ?? SYMBOL_TEXT[m[0]], guardFrom: from, guardTo: to });
   }
   // Hide the braces that only delimit a \color scope: {\color{red} text}.
   for (const m of masked.matchAll(/\{\s*\\color\s*(?:\[[^\]]*\])?\s*\{[^}]*\}/g)) {
     const open = m.index!;
     const close = scopeEnd(masked, open + m[0].length);
-    if (masked[close] !== "}" || touches(open, close + 1)) continue;
-    found.push({ from: open, to: open + 1, text: "" }, { from: close, to: close + 1, text: "" });
+    if (masked[close] !== "}" || overlapsAny(skip, open, close + 1)) continue;
+    found.push(
+      { from: open, to: open + 1, text: "", guardFrom: open, guardTo: close + 1 },
+      { from: close, to: close + 1, text: "", guardFrom: open, guardTo: close + 1 },
+    );
   }
-
   found.sort((a, b) => a.from - b.from);
+  symbolCandidates = found;
+  return found;
+}
+
+function symbolDecorations(view: EditorView): DecorationSet {
+  if (!visualMode) return Decoration.none;
+  const selection = view.state.selection.ranges;
   const builder = new RangeSetBuilder<Decoration>();
   let last = -1;
-  for (const f of found) {
+  for (const f of symbolsOf(view)) {
+    if (selection.some((r) => r.from <= f.guardTo && r.to >= f.guardFrom)) continue;
     if (f.from < last) continue;
     builder.add(f.from, f.to, f.text ? Decoration.replace({ widget: new SymbolWidget(f.text) }) : Decoration.replace({}));
     last = f.to;

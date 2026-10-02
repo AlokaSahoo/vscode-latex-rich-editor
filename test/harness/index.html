@@ -2,9 +2,12 @@
 <body style="margin:0"><div id="editor"></div>
 <script>
 window.sent = [];
+window.__LR_DEBUG = true;
 window.acquireVsCodeApi = () => ({ postMessage: (m) => { window.sent.push(m); if (m.type === "ready") setTimeout(() => window.postMessage(window.__init(), "*"), 0); } });
 const filler = Array.from({length: 60}, (_, i) => `Paragraph ${i} lorem ipsum dolor sit amet consectetur adipiscing elit.\n`).join("\n");
 window.__text = `\\documentclass{revtex4-2}\n\\newcommand{\\half}{\\frac{1}{2}}\n\\begin{document}\n\\section{Intro}\n${filler}\n\\begin{equation}\n\\label{eq:a}\nE = \\half m c^2 + \\ket{\\psi}\n\\end{equation}\n\nAfter equation text.\n\n\\[ x^2 + y^2 = z^2 \\]\n\n${filler}\n\\end{document}\n`;
+const file = new URLSearchParams(location.search).get("file");
+if (file) { const x = new XMLHttpRequest(); x.open("GET", "../../" + file, false); x.send(); window.__text = x.responseText; }
 window.__init = () => ({ type: "init", text: window.__text, customCommands: {}, pageWidth: 880, pageAlign: "center", showToolbar: true, pdfWorkerUrl: "../../dist/pdf.worker.min.mjs", references: { labels: {}, citations: {} }, project: { externalLabels: [], bibliography: [] } });
 </script>
-<script src="../../dist/webview-editor.js"></script></body></html>
+<script src="../../dist/webview-editor.js"></script><script>if (new URLSearchParams(location.search).get("bench")) document.write('<script src="../../bench/browser-bench.js"><\/script>');</script></body></html>

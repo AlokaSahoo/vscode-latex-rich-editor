@@ -194,6 +194,8 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
     ],
   });
   view = new EditorView({ state });
+  // The test harness sets this to drive and time the editor.
+  if ((window as { __LR_DEBUG?: boolean }).__LR_DEBUG) (window as { __lrView?: EditorView }).__lrView = view;
   // Keep the host's idea of the scroll position current for view switches.
   view.scrollDOM.addEventListener("scroll", () => view && reportPosition(view), { passive: true });
   const container = document.getElementById("editor")!;

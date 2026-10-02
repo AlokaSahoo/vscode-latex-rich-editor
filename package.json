@@ -2,7 +2,7 @@
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
   "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
   "icon": "images/icon.png",
@@ -95,7 +95,7 @@
       {
         "command": "latexRich.newPaper",
         "category": "LaTeX",
-        "title": "New REVTeX Paper…"
+        "title": "New REVTeX Paper\u2026"
       },
       {
         "command": "latexRich.checkSetup",
@@ -209,7 +209,7 @@
             "lualatex"
           ],
           "default": "auto",
-          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = …` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
+          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = \u2026` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
         },
         "latexRich.syncAfterCompile": {
           "type": "boolean",
@@ -225,7 +225,7 @@
             "off"
           ],
           "enumDescriptions": [
-            "Every REVTeX document (Letters in PRL, PRB, PRA, PRX… share the 3750-word limit)",
+            "Every REVTeX document (Letters in PRL, PRB, PRA, PRX\u2026 share the 3750-word limit)",
             "Only REVTeX documents with the prl option",
             "Every LaTeX document",
             "Never show it"

@@ -53,13 +53,22 @@ export function countLength(mainFile: string, mainText?: string, limit = LETTER_
   const equations = { rows: 0, words: 0 };
   let captionWords = 0;
 
-  // Work outermost-first so a figure's internals aren't counted twice.
-  const spans = environments(body).filter((s, _i, all) => !all.some((o) => o !== s && o.begin < s.begin && s.end <= o.end && isCounted(o.name)));
+  // Work outermost-first so a figure's internals aren't counted twice. Spans are sorted by
+  // start, so one sweep with the furthest end of the counted spans seen so far finds the nested ones.
+  const all = environments(body);
+  const widetext = all.filter((s) => s.name === "widetext");
+  const spans: typeof all = [];
+  let coveredUntil = -1;
+  for (const s of all) {
+    if (s.end <= coveredUntil) continue;
+    spans.push(s);
+    if (isCounted(s.name)) coveredUntil = Math.max(coveredUntil, s.end);
+  }
   const cuts: Array<{ from: number; to: number }> = [];
   for (const span of spans) {
     const content = body.slice(span.bodyFrom, span.bodyTo);
     // Only a figure*/table* spans both columns; align* and friends just drop the numbering.
-    const wide = /^(figure|table)\*$/.test(span.name) || insideWidetext(body, span.begin);
+    const wide = /^(figure|table)\*$/.test(span.name) || insideWidetext(widetext, span.begin);
     if (EXCLUDED_ENV.test(span.name)) {
       cuts.push({ from: span.begin, to: span.end });
     } else if (/^figure\*?$/.test(span.name)) {
@@ -83,12 +92,13 @@ export function countLength(mainFile: string, mainText?: string, limit = LETTER_
     }
   }
   body = cutRanges(body, cuts);
+  const widetextAfterCut = environments(body).filter((s) => s.name === "widetext");
 
   // \[ … \] and $$ … $$ display math.
   body = body.replace(/\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g, (match, a, b, offset) => {
     const rows = mathRows(a ?? b);
     equations.rows += rows;
-    equations.words += rows * (insideWidetext(body, offset) ? 32 : 16);
+    equations.words += rows * (insideWidetext(widetextAfterCut, offset) ? 32 : 16);
     return " ";
   });
 
@@ -140,8 +150,8 @@ function cutRanges(text: string, cuts: Array<{ from: number; to: number }>): str
   return result + text.slice(at);
 }
 
-function insideWidetext(text: string, offset: number): boolean {
-  return environments(text).some((s) => s.name === "widetext" && s.begin < offset && offset < s.end);
+function insideWidetext(widetext: Array<{ begin: number; end: number }>, offset: number): boolean {
+  return widetext.some((s) => s.begin < offset && offset < s.end);
 }
 
 function captionText(content: string): string {

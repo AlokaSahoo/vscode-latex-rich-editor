@@ -95,6 +95,23 @@ export function readGroup(text: string, open: number): { content: string; end: n
   return null;
 }
 
+/** Same as `lineAt` for many offsets in one text: builds the line starts once, then binary-searches. */
+export function lineIndex(text: string): (offset: number) => number {
+  const starts: number[] = [];
+  for (let i = text.indexOf("\n"); i >= 0; i = text.indexOf("\n", i + 1)) starts.push(i);
+  // starts[k] is the offset of the k-th newline; the line of an offset is the number of newlines before it.
+  return (offset) => {
+    let lo = 0;
+    let hi = starts.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (starts[mid] < offset) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+}
+
 export function lineAt(text: string, offset: number): number {
   let line = 0;
   for (let i = 0; i < offset && i < text.length; i++) if (text[i] === "\n") line++;
@@ -174,6 +191,8 @@ export interface LabelInfo {
 export function findLabels(text: string): LabelInfo[] {
   const masked = maskComments(text);
   const spans = environments(masked);
+  const lineOf = lineIndex(text);
+  const headings = headingsIn(text, masked);
   const labels: LabelInfo[] = [];
   for (const m of masked.matchAll(/\\label\s*\{([^}]+)\}/g)) {
     const at = m.index!;
@@ -181,7 +200,7 @@ export function findLabels(text: string): LabelInfo[] {
     const math = [...stack].reverse().find((s) => MATH_ENVIRONMENTS.has(s.name));
     const figure = [...stack].reverse().find((s) => FIGURE_ENVIRONMENTS.test(s.name));
     const table = [...stack].reverse().find((s) => TABLE_ENVIRONMENTS.test(s.name));
-    const info: LabelInfo = { key: m[1].trim(), line: lineAt(text, at), kind: "other", context: "" };
+    const info: LabelInfo = { key: m[1].trim(), line: lineOf(at), kind: "other", context: "" };
     if (math) {
       info.kind = "equation";
       info.environment = math.name;
@@ -192,7 +211,7 @@ export function findLabels(text: string): LabelInfo[] {
       info.context = captionIn(text, masked, span) ?? "";
       if (figure) info.graphic = /\\includegraphics\*?\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/.exec(masked.slice(span.bodyFrom, span.bodyTo))?.[1];
     } else {
-      const heading = lastHeadingBefore(text, masked, at);
+      const heading = lastHeadingBefore(masked, headings, at);
       if (heading) {
         info.kind = "section";
         info.context = heading;
@@ -216,14 +235,38 @@ function captionIn(text: string, masked: string, span: EnvironmentSpan): string 
 
 const HEADING = /\\(part|chapter|section|subsection|subsubsection|paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{/g;
 
-function lastHeadingBefore(text: string, masked: string, offset: number): string | undefined {
-  let title: string | undefined;
-  for (const m of masked.slice(0, offset).matchAll(HEADING)) {
+interface Heading {
+  from: number;
+  end: number;
+  title: string;
+}
+
+function headingsIn(text: string, masked: string): Heading[] {
+  const found: Heading[] = [];
+  for (const m of masked.matchAll(HEADING)) {
     const group = readGroup(text, m.index! + m[0].length - 1);
-    // Only a label right after its heading belongs to it.
-    if (group && /^\s*$/.test(masked.slice(group.end, offset))) title = plainText(group.content);
+    if (group) found.push({ from: m.index!, end: group.end, title: plainText(group.content) });
   }
-  return title;
+  return found;
+}
+
+/** The title of the heading a label at `offset` directly follows (only whitespace between), if any. */
+function lastHeadingBefore(masked: string, headings: Heading[], offset: number): string | undefined {
+  // The last heading starting before the label; an earlier one can't qualify, as the later one would sit between.
+  let lo = 0;
+  let hi = headings.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (headings[mid].from < offset) lo = mid + 1;
+    else hi = mid;
+  }
+  for (let i = lo - 1; i >= 0; i--) {
+    const heading = headings[i];
+    // A label inside the heading's own braces belongs to it, as does one that follows it directly.
+    if (heading.end > offset || /^\s*$/.test(masked.slice(heading.end, offset))) return heading.title;
+    return undefined;
+  }
+  return undefined;
 }
 
 /** Strips LaTeX markup down to readable text (for captions, titles, tooltips). */
@@ -334,12 +377,13 @@ const LEVELS: Record<string, number> = {
 
 export function outline(text: string): OutlineItem[] {
   const masked = maskComments(text);
+  const lineOf = lineIndex(text);
   const flat: Array<OutlineItem & { at: number }> = [];
 
   for (const m of masked.matchAll(HEADING)) {
     const group = readGroup(text, m.index! + m[0].length - 1);
     if (!group) continue;
-    flat.push({ kind: "section", level: LEVELS[m[1]], title: plainText(group.content), line: lineAt(text, m.index!), at: m.index!, children: [] });
+    flat.push({ kind: "section", level: LEVELS[m[1]], title: plainText(group.content), line: lineOf(m.index!), at: m.index!, children: [] });
   }
   for (const span of environments(masked)) {
     const kind = FIGURE_ENVIRONMENTS.test(span.name) && span.name !== "subfigure"
@@ -354,7 +398,7 @@ export function outline(text: string): OutlineItem[] {
     const label = /\\label\s*\{([^}]+)\}/.exec(body)?.[1];
     const caption = kind === "equation" ? undefined : captionIn(text, masked, span);
     const title = caption || (kind === "equation" ? plainEquation(text.slice(span.bodyFrom, span.bodyTo)) : span.name);
-    flat.push({ kind, level: 9, title, line: lineAt(text, span.begin), at: span.begin, label, children: [] });
+    flat.push({ kind, level: 9, title, line: lineOf(span.begin), at: span.begin, label, children: [] });
   }
 
   flat.sort((a, b) => a.at - b.at);
