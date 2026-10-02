@@ -22,6 +22,36 @@ Overleaf-style rich-text (WYSIWYM) editing for `.tex` files in VS Code, with com
 - **PDF preview** beside the editor (moon button for dark pages), crisp on high-DPI screens, keeping its scroll position across recompiles. **Double-click the PDF** to jump to the matching source line — in the rich view or the raw editor, whichever you're using.
 - **Clean auxiliary files** in one click.
 
+## Getting started
+
+No configuration is needed — there are no build recipes or tool paths to set up. After installing:
+
+1. **Check TeX is reachable.** In a terminal, run `latexmk -v`. If it prints a version, you're set. If not, install a TeX distribution (see Installation) and **fully quit and reopen VS Code** so it picks up the new `PATH`.
+2. **Open a `.tex` file** (or run **LaTeX: New REVTeX Paper…** from the Command Palette to start one). It opens in the rich view.
+3. **Click ▶ Compile** in the editor's title bar. The PDF opens beside the editor; double-click anywhere in it to jump to that line of the source.
+
+That's the whole setup. Everything else (settings, raw view, length check, arXiv package) is optional.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "latexmk was not found on your PATH" | Install TeX, then quit and reopen VS Code. On macOS, MacTeX installs to `/Library/TeX/texbin`; run `eval "$(/usr/libexec/path_helper)"` in a terminal or log out and back in if `latexmk -v` still fails. |
+| "TeX binaries are built for a different CPU" (Apple Silicon) | Run `softwareupdate --install-rosetta --agree-to-license`, or switch to MacTeX, which is native. |
+| Windows: compile fails immediately with MiKTeX | MiKTeX's `latexmk` needs Perl — install [Strawberry Perl](https://strawberryperl.com/) and restart VS Code. In MiKTeX Console, allow installing missing packages on the fly. |
+| Compile errors | They appear in the Problems panel (`⌘⇧M` / `Ctrl+Shift+M`); the full log is in Output → **LaTeX Rich Editor**. |
+| `\ref`/`\cite` show keys instead of numbers | Compile once — the numbers come from the `.aux` file the compile writes. |
+| Double-clicking the PDF does nothing | Compile again after **Clean Auxiliary Files**; the jump needs the `.synctex.gz` file. |
+| `.tex` files open in the plain editor | Click the **Open Rich View** button (eye icon) or press `⌘⇧V` / `Ctrl+Shift+V`. |
+
+### Using it alongside LaTeX Workshop
+
+Both can be installed. This extension opens `.tex` files in the rich view by default; LaTeX Workshop keeps working in the raw view. To avoid two tools compiling the same file at once, either use only one extension's compile button, or turn off LaTeX Workshop's automatic build in your settings:
+
+```json
+"latex-workshop.latex.autoBuild.run": "never"
+```
+
 ## Controls
 
 The buttons in the editor's title bar work like Markdown's preview buttons:
