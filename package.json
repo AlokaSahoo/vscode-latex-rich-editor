@@ -2,7 +2,7 @@
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
   "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
   "icon": "images/icon.png",
@@ -95,7 +95,7 @@
       {
         "command": "latexRich.newPaper",
         "category": "LaTeX",
-        "title": "New REVTeX Paper\u2026"
+        "title": "New REVTeX Paper…"
       },
       {
         "command": "latexRich.checkSetup",
@@ -149,7 +149,7 @@
         "latexRich.customCommands": {
           "type": "object",
           "default": {},
-          "markdownDescription": "Style LaTeX commands the rich view doesn't recognize (your own macros, package commands). Map a command name (no backslash) to one of: `bold`, `italic`, `underline`, `reference`, `hidden`. Example: `{ \"keyterm\": \"bold\", \"todo\": \"hidden\" }`. Common REVTeX commands (`\\affiliation`, `\\email`, `\\eqref`, `\\onlinecite`, \u2026) are styled already. Applies the next time a file is opened in the rich editor.",
+          "markdownDescription": "Style LaTeX commands the rich view doesn't recognize (your own macros, package commands). Map a command name (no backslash) to one of: `bold`, `italic`, `underline`, `reference`, `hidden`.",
           "additionalProperties": {
             "type": "string",
             "enum": [
@@ -165,7 +165,7 @@
           "type": "number",
           "default": 880,
           "minimum": 0,
-          "markdownDescription": "Maximum width in pixels of the rich view's text column. It stands in for the paper's `\\textwidth`, so figures sized with `\\linewidth`, `\\columnwidth`, `scale=` or physical units keep their proportions. `0` uses the full editor width. Applies the next time a file is opened."
+          "markdownDescription": "Maximum width in pixels of the rich view's text column. It stands in for the paper's `\\textwidth`, so figures sized with `\\linewidth`, `\\columnwidth`, `scale=[...]`, etc. fit the page."
         },
         "latexRich.showToolbar": {
           "type": "boolean",
@@ -186,7 +186,7 @@
             "lualatex"
           ],
           "default": "auto",
-          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = \u2026` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
+          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = …` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
         },
         "latexRich.syncAfterCompile": {
           "type": "boolean",
