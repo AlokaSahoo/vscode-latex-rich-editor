@@ -16,7 +16,7 @@ Overleaf-style rich-text (WYSIWYM) editing for `.tex` files in VS Code, with com
 - **Paste or drop images** — paste a screenshot or drop a PNG/PDF (hold <kbd>Shift</kbd> while dropping, as VS Code requires) and it's saved under `figures/` with a complete `figure` environment inserted, cursor in the caption. Images already inside the paper's folder are referenced in place, not copied.
 - **LaTeX Outline** in the Explorer — sections, figures, tables and equations with their labels; click to jump. The raw editor also gets the standard Outline view and breadcrumbs.
 - **Prepare arXiv Submission** — one command builds `<paper>-arxiv.zip`: sources with comments removed, only the figures actually used, the `.bbl` (arXiv doesn't run BibTeX) and any local `.cls`/`.sty`/`.bst`, with warnings for anything missing.
-- **PRL length check** — counts the way the [APS length guide](https://journals.aps.org/authors/length-guide) does: text, captions and footnotes, plus 16 words per displayed-equation row (32 if two-column), 150/aspect + 20 per figure (300/(0.5·aspect) + 40 for `figure*`, aspect read from the image file), and 13 + 6.5/line per table. Title, authors, abstract, acknowledgments and references are excluded. PRL documents show a live count in the status bar.
+- **PRL length check** — counts the way the [APS length guide](https://journals.aps.org/authors/length-guide) does: text, captions and footnotes, plus 16 words per displayed-equation row (32 if two-column), 150/aspect + 20 per figure (300/(0.5·aspect) + 40 for `figure*`, aspect read from the image file), and 13 + 6.5/line per table. Title, authors, abstract, acknowledgments and references are excluded. Every REVTeX paper shows a live count in the status bar (bottom right; red when over the limit — click it for the breakdown), counting the whole paper even when you're editing an `\\input` chapter.
 - **New REVTeX Paper** — starts a PRL, PRB, PRX or single-column preprint with a starter `references.bib` and a `figures/` folder.
 - **Compile** with `latexmk`; errors appear as VS Code Problems at the offending line.
 - **PDF preview** beside the editor (moon button for dark pages), crisp on high-DPI screens, keeping its scroll position across recompiles. **Double-click the PDF** to jump to the matching source line — in the rich view or the raw editor, whichever you're using.
@@ -64,7 +64,7 @@ The buttons in the editor's title bar work like Markdown's preview buttons:
 | ▶ | **LaTeX: Compile** | — | both |
 | split preview | **LaTeX: Open PDF Preview to the Side** (compiles first if there's no PDF yet) | `⌘K V` / `Ctrl+K V` | both |
 | `…` menu | **LaTeX: Clean Auxiliary Files** | — | both |
-| `…` menu | **LaTeX: Check PRL Length** (also the status-bar word count) | — | both |
+| `…` menu | **LaTeX: Check APS Length (Word Count)** (also the status-bar word count) | — | both |
 | `…` menu | **LaTeX: Prepare arXiv Submission** | — | both |
 | Command Palette | **LaTeX: New REVTeX Paper…** | — | anywhere |
 
@@ -86,10 +86,10 @@ A TeX distribution with `latexmk` on your `PATH` (TeX Live, MacTeX or MiKTeX). R
 
 One `.vsix` file works on macOS, Windows and Linux — no Node or npm needed to install it.
 
-1. Download `latex-rich-editor-v0.1.3.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
+1. Download `latex-rich-editor-v0.1.4.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
 2. Install it, either:
    - **In VS Code:** Extensions view (`⌘⇧X` / `Ctrl+Shift+X`) → `…` menu at the top → **Install from VSIX…** → pick the file, or
-   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.3.vsix`
+   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.4.vsix`
 3. Reload VS Code. `.tex` files now open in the rich view.
 4. For compiling, install a TeX distribution with `latexmk`: [MacTeX](https://tug.org/mactex/) on macOS, [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/) on Windows, TeX Live on Linux (e.g. `sudo apt install texlive-full latexmk`).
 
@@ -117,6 +117,8 @@ Install a checker extension — [LTeX+](https://marketplace.visualstudio.com/ite
 | Setting | Default | |
 |---|---|---|
 | `latexRich.customCommands` | `{}` | Style commands the rich view doesn't recognize. Map a name (no backslash) to `bold`, `italic`, `underline`, `reference` or `hidden`, e.g. `{ "keyterm": "bold", "todo": "hidden" }`. |
+| `latexRich.wordCount` | `revtex` | When to show the status-bar word count: `revtex` (every REVTeX paper), `prl` (only `prl`), `always`, or `off`. |
+| `latexRich.wordLimit` | `3750` | Limit the count is compared against (3750 for Letters, 750 for PRL Comments). |
 | `latexRich.showToolbar` | `true` | Show the formatting toolbar above the rich view. |
 | `latexRich.pageWidth` | `880` | Max width (px) of the rich view's text column, which stands in for `\textwidth` when sizing figures. `0` = full editor width. |
 

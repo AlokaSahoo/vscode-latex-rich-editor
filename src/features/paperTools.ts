@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
 import * as path from "path";
 import { activeTexDocument, commandTexDocument } from "../activeDocument";
 import { buildArxivPackage } from "../arxivPackage";
@@ -30,11 +31,18 @@ export function registerPaperTools(context: vscode.ExtensionContext, output: vsc
     clearTimeout(timer);
     timer = setTimeout(() => {
       const document = activeTexDocument();
-      if (!document || document.uri.scheme !== "file" || !isLetter(document.getText())) {
+      if (!document || document.uri.scheme !== "file") {
         status.hide();
         return;
       }
-      const report = countLength(document.uri.fsPath, document.getText());
+      // Count the whole paper, also when a chapter file is the one open.
+      const root = rootOf(document);
+      const rootText = root === document.uri.fsPath ? document.getText() : readFile(root);
+      if (rootText === undefined || !showsWordCount(rootText, document.uri)) {
+        status.hide();
+        return;
+      }
+      const report = countLength(root, root === document.uri.fsPath ? document.getText() : undefined, wordLimit(document.uri));
       status.text = `$(book) ${report.total.toLocaleString()} / ${report.limit.toLocaleString()} words`;
       status.tooltip = "APS length estimate (text + captions + equations + figures + tables). Click for the breakdown.";
       status.backgroundColor = report.total > report.limit ? new vscode.ThemeColor("statusBarItem.errorBackground") : undefined;
@@ -44,12 +52,33 @@ export function registerPaperTools(context: vscode.ExtensionContext, output: vsc
   context.subscriptions.push(
     vscode.window.tabGroups.onDidChangeTabs(update),
     vscode.workspace.onDidChangeTextDocument(update),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("latexRich.wordCount") || e.affectsConfiguration("latexRich.wordLimit")) update();
+    }),
   );
   update();
 }
 
-function isLetter(text: string): boolean {
-  return /\\documentclass\s*\[[^\]]*\bprl\b[^\]]*\]\s*\{revtex/.test(text);
+function readFile(file: string): string | undefined {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function wordLimit(uri: vscode.Uri): number {
+  return vscode.workspace.getConfiguration("latexRich", uri).get<number>("wordLimit", 3750);
+}
+
+// REVTeX can't tell a Letter from a regular article (PRB Letters and PRB
+// articles both use "prb"), so by default every REVTeX paper gets the count.
+function showsWordCount(rootText: string, uri: vscode.Uri): boolean {
+  const mode = vscode.workspace.getConfiguration("latexRich", uri).get<string>("wordCount", "revtex");
+  if (mode === "off") return false;
+  if (mode === "always") return true;
+  if (mode === "prl") return /\\documentclass\s*\[[^\]]*\bprl\b[^\]]*\]\s*\{revtex/.test(rootText);
+  return /\\documentclass\s*(\[[^\]]*\])?\s*\{revtex/.test(rootText);
 }
 
 // --- arXiv -----------------------------------------------------------------
@@ -94,7 +123,7 @@ async function prepareArxiv(document: vscode.TextDocument) {
 async function showLengthReport(document: vscode.TextDocument, output: vscode.OutputChannel) {
   if (document.uri.scheme !== "file") return;
   const root = rootOf(document);
-  const report = countLength(root, root === document.uri.fsPath ? document.getText() : undefined);
+  const report = countLength(root, root === document.uri.fsPath ? document.getText() : undefined, wordLimit(document.uri));
   output.clear();
   output.appendLine(formatReport(path.basename(document.uri.fsPath), report));
   const percent = Math.round((report.total / report.limit) * 100);
@@ -105,7 +134,7 @@ async function showLengthReport(document: vscode.TextDocument, output: vscode.Ou
 
 function formatReport(file: string, r: LengthReport): string {
   const lines = [
-    `APS length estimate for ${file} — Letter limit ${r.limit} words`,
+    `APS length estimate for ${file} — limit ${r.limit} words (latexRich.wordLimit)`,
     "(rules: journals.aps.org/authors/length-guide; title, authors, abstract, acknowledgments and references excluded)",
     "",
     `  Text                         ${r.textWords}`,

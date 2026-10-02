@@ -39,7 +39,7 @@ const EXCLUDED_COMMANDS = [
 ];
 
 /** `mainText` lets callers count unsaved editor contents of the main file. */
-export function countLength(mainFile: string, mainText?: string): LengthReport {
+export function countLength(mainFile: string, mainText?: string, limit = LETTER_LIMIT): LengthReport {
   const root = path.dirname(mainFile);
   const source = expandInputs(mainFile, root, new Set(), mainText);
   const begin = source.search(/\\begin\s*\{document\}/);
@@ -94,7 +94,7 @@ export function countLength(mainFile: string, mainText?: string): LengthReport {
   const total = Math.round(
     textWords + captionWords + equations.words + figures.reduce((s, f) => s + f.words, 0) + tables.reduce((s, t) => s + t.words, 0),
   );
-  return { textWords, captionWords, equations, figures, tables, total, limit: LETTER_LIMIT };
+  return { textWords, captionWords, equations, figures, tables, total, limit };
 }
 
 function isCounted(name: string): boolean {

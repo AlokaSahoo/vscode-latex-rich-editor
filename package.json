@@ -2,7 +2,7 @@
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
   "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
   "icon": "images/icon.png",
@@ -90,12 +90,12 @@
       {
         "command": "latexRich.lengthCheck",
         "category": "LaTeX",
-        "title": "Check PRL Length"
+        "title": "Check APS Length (Word Count)"
       },
       {
         "command": "latexRich.newPaper",
         "category": "LaTeX",
-        "title": "New REVTeX Paper…"
+        "title": "New REVTeX Paper\u2026"
       },
       {
         "command": "latexRich.checkSetup",
@@ -186,12 +186,35 @@
             "lualatex"
           ],
           "default": "auto",
-          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = …` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
+          "markdownDescription": "TeX engine. `auto` uses a `% !TEX program = \u2026` comment if present, xelatex when the paper loads `fontspec`/`unicode-math`/`polyglossia`, and pdflatex otherwise."
         },
         "latexRich.syncAfterCompile": {
           "type": "boolean",
           "default": true,
           "markdownDescription": "After a successful compile, scroll the PDF preview to the cursor's position."
+        },
+        "latexRich.wordCount": {
+          "type": "string",
+          "enum": [
+            "revtex",
+            "prl",
+            "always",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Every REVTeX document (Letters in PRL, PRB, PRA, PRX\u2026 share the 3750-word limit)",
+            "Only REVTeX documents with the prl option",
+            "Every LaTeX document",
+            "Never show it"
+          ],
+          "default": "revtex",
+          "markdownDescription": "When to show the live APS word count in the status bar. Click it for the full breakdown."
+        },
+        "latexRich.wordLimit": {
+          "type": "number",
+          "default": 3750,
+          "minimum": 1,
+          "markdownDescription": "Word limit the count is compared against: 3750 for Letters, 750 for PRL Comments/Replies."
         }
       }
     },
