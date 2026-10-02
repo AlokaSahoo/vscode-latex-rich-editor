@@ -2,7 +2,7 @@
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
   "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
   "icon": "images/icon.png",

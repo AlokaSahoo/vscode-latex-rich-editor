@@ -86,10 +86,10 @@ A TeX distribution with `latexmk` on your `PATH` (TeX Live, MacTeX or MiKTeX). R
 
 One `.vsix` file works on macOS, Windows and Linux — no Node or npm needed to install it.
 
-1. Download `latex-rich-editor-v0.1.0.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
+1. Download `latex-rich-editor-v0.1.1.vsix` (or the latest) from the [Releases page](https://github.com/AlokaSahoo/vscode-latex-rich-editor/releases).
 2. Install it, either:
    - **In VS Code:** Extensions view (`⌘⇧X` / `Ctrl+Shift+X`) → `…` menu at the top → **Install from VSIX…** → pick the file, or
-   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.0.vsix`
+   - **From a terminal:** `code --install-extension latex-rich-editor-v0.1.1.vsix`
 3. Reload VS Code. `.tex` files now open in the rich view.
 4. For compiling, install a TeX distribution with `latexmk`: [MacTeX](https://tug.org/mactex/) on macOS, [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/) on Windows, TeX Live on Linux (e.g. `sudo apt install texlive-full latexmk`).
 
