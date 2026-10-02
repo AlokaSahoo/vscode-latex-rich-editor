@@ -19,7 +19,17 @@ export interface TextChange {
 
 export interface EditorDiagnostic {
   line: number; // 0-based
+  /** Offsets of the flagged text; equal when the whole line is meant. */
+  from: number;
+  to: number;
   message: string;
+  severity: "error" | "warning" | "info";
+  source?: string;
+}
+
+export interface FixOption {
+  index: number;
+  title: string;
 }
 
 export interface ReferenceTable {
@@ -45,7 +55,8 @@ export type HostToWebviewMessage =
   | { type: "project"; project: ProjectData }
   | { type: "imageResolved"; requestId: string; url: string | null; kind: ImageKind }
   | { type: "figuresAdded"; requestId: string; paths: string[]; error?: string }
-  | { type: "revealLine"; line: number };
+  | { type: "revealLine"; line: number }
+  | { type: "fixes"; requestId: string; fixes: FixOption[] };
 
 export type WebviewToHostMessage =
   | { type: "ready" }
@@ -53,6 +64,8 @@ export type WebviewToHostMessage =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "cursor"; line: number }
+  | { type: "requestFixes"; requestId: string; from: number; to: number }
+  | { type: "applyFix"; requestId: string; index: number }
   | { type: "resolveImage"; requestId: string; path: string }
   | {
       type: "addFigures";

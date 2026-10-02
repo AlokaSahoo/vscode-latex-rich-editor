@@ -30,7 +30,7 @@ import {
   setReferences,
   setVisualMode,
 } from "./latexEnhancements";
-import { errorExtensions, showErrors } from "./errors";
+import { errorExtensions, resolveFixes, setFixChannel, showErrors } from "./errors";
 import type { HostToWebviewMessage, ImageKind, TextChange, WebviewToHostMessage } from "./protocol";
 import { resolveFigures, setFigureUploader, setImageLoader, setProjectData, smartExtensions } from "./smartFeatures";
 
@@ -147,6 +147,10 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
   setProjectData(message.project);
   setImageLoader((resolvedPath, src) => resolver.resolve(resolvedPath, src));
   setFigureUploader((requestId, files, uris) => post({ type: "addFigures", requestId, files, uris }));
+  setFixChannel(
+    (requestId, from, to) => post({ type: "requestFixes", requestId, from, to }),
+    (requestId, index) => post({ type: "applyFix", requestId, index }),
+  );
   if (message.pageWidth > 0) {
     document.documentElement.style.setProperty("--lr-page-width", `${message.pageWidth}px`);
   }
@@ -208,6 +212,9 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
       break;
     case "changes":
       applyRemoteChanges(message.changes);
+      break;
+    case "fixes":
+      resolveFixes(message.requestId, message.fixes);
       break;
     case "diagnostics":
       if (view) showErrors(view, message.items);

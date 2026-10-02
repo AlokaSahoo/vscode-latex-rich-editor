@@ -110,7 +110,7 @@ npx vsce package
 
 ### Spelling and grammar
 
-The rich view doesn't spell-check yet. In the raw editor (**Reopen as Raw LaTeX**), extensions such as [LTeX+](https://marketplace.visualstudio.com/items?itemName=ltex-plus.vscode-ltex-plus) (spelling and grammar) or Code Spell Checker work as usual.
+Install a checker extension — [LTeX+](https://marketplace.visualstudio.com/items?itemName=ltex-plus.vscode-ltex-plus) for spelling **and** grammar (LanguageTool, runs locally), or Code Spell Checker for spelling only. Its findings appear in the rich view too: a squiggle on the flagged words (yellow warnings, blue suggestions, red errors), the message and the checker's quick fixes on hover (e.g. *statements → statement*, *Add to dictionary*), and **F8 / Shift+F8** to step through them.
 
 ## Settings
 

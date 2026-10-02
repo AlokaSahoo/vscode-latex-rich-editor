@@ -8,6 +8,7 @@ import type {
   CustomCommandStyle,
   HostToWebviewMessage,
   ImageKind,
+  EditorDiagnostic,
   ProjectData,
   TextChange,
   WebviewToHostMessage,
@@ -24,6 +25,7 @@ async function projectData(document: vscode.TextDocument): Promise<ProjectData> 
 }
 
 interface OpenPanel {
+  document: vscode.TextDocument;
   panel: vscode.WebviewPanel;
   post: (message: HostToWebviewMessage) => Thenable<boolean>;
   ready: boolean;
@@ -43,10 +45,24 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
     return RichEditorProvider.cursors.get(uri.toString());
   }
 
-  /** Shows compile errors inside the open rich view of each file. */
-  public static showDiagnostics(uri: vscode.Uri, items: Array<{ line: number; message: string }>) {
+  /** Sends all of VS Code's diagnostics for a file (compile errors, spelling, grammar) to its rich view. */
+  public static refreshDiagnostics(uri: vscode.Uri) {
     const open = RichEditorProvider.panels.get(uri.toString());
-    if (open?.ready) open.post({ type: "diagnostics", items });
+    if (!open?.ready) return;
+    const severity = (s: vscode.DiagnosticSeverity) =>
+      s === vscode.DiagnosticSeverity.Error ? "error" : s === vscode.DiagnosticSeverity.Warning ? "warning" : "info";
+    const items: EditorDiagnostic[] = vscode.languages
+      .getDiagnostics(uri)
+      .filter((d) => d.severity !== vscode.DiagnosticSeverity.Hint)
+      .map((d) => ({
+        line: d.range.start.line,
+        from: open.document.offsetAt(d.range.start),
+        to: open.document.offsetAt(d.range.end),
+        message: d.message,
+        severity: severity(d.severity),
+        source: d.source,
+      }));
+    open.post({ type: "diagnostics", items });
   }
 
   constructor(private readonly context: vscode.ExtensionContext) {}
@@ -102,7 +118,9 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
 
     const post = (message: HostToWebviewMessage) => webviewPanel.webview.postMessage(message);
     const key = document.uri.toString();
-    const entry: OpenPanel = { panel: webviewPanel, post, ready: false };
+    const entry: OpenPanel = { document, panel: webviewPanel, post, ready: false };
+    // Quick fixes offered on hover, kept until the next hover asks again.
+    const offeredFixes = new Map<string, Array<vscode.CodeAction | vscode.Command>>();
     RichEditorProvider.panels.set(key, entry);
 
     // Label/citation numbers come from the .aux file; refresh them whenever a
@@ -183,13 +201,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
             project: await projectData(document),
           });
           entry.ready = true;
-          RichEditorProvider.showDiagnostics(
-            document.uri,
-            vscode.languages
-              .getDiagnostics(document.uri)
-              .filter((d) => d.severity === vscode.DiagnosticSeverity.Error)
-              .map((d) => ({ line: d.range.start.line, message: d.message })),
-          );
+          RichEditorProvider.refreshDiagnostics(document.uri);
           const pending = RichEditorProvider.pendingReveals.get(key);
           if (pending !== undefined) {
             RichEditorProvider.pendingReveals.delete(key);
@@ -206,6 +218,28 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
         case "redo":
           queue = queue.then(() => vscode.commands.executeCommand(message.type));
           break;
+        case "requestFixes": {
+          const range = new vscode.Range(document.positionAt(message.from), document.positionAt(message.to));
+          const actions =
+            (await vscode.commands.executeCommand<Array<vscode.CodeAction | vscode.Command>>(
+              "vscode.executeCodeActionProvider",
+              document.uri,
+              range,
+              vscode.CodeActionKind.QuickFix.value,
+            )) ?? [];
+          offeredFixes.clear();
+          offeredFixes.set(message.requestId, actions);
+          post({ type: "fixes", requestId: message.requestId, fixes: actions.map((a, index) => ({ index, title: a.title })) });
+          break;
+        }
+        case "applyFix": {
+          const action = offeredFixes.get(message.requestId)?.[message.index];
+          if (!action) break;
+          if ("edit" in action && action.edit) await vscode.workspace.applyEdit(action.edit);
+          const command = "command" in action && typeof action.command === "object" ? action.command : (action as vscode.Command);
+          if (command?.command) await vscode.commands.executeCommand(command.command, ...(command.arguments ?? []));
+          break;
+        }
         case "cursor":
           RichEditorProvider.cursors.set(key, message.line);
           break;

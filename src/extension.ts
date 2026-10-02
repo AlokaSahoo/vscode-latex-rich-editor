@@ -82,14 +82,9 @@ export function activate(context: vscode.ExtensionContext) {
       const target = /\.tex$/i.test(saved.uri.path) ? saved : activeTexDocument();
       if (target) void compileAndPreview(target, true);
     }),
-    // Compile errors also appear inside the rich view (underlined; F8 to step).
+    // Compile errors and spelling/grammar findings also appear in the rich view.
     vscode.languages.onDidChangeDiagnostics((e) => {
-      for (const uri of e.uris) {
-        const items = vscode.languages.getDiagnostics(uri)
-          .filter((d) => d.severity === vscode.DiagnosticSeverity.Error)
-          .map((d) => ({ line: d.range.start.line, message: d.message }));
-        RichEditorProvider.showDiagnostics(uri, items);
-      }
+      for (const uri of e.uris) RichEditorProvider.refreshDiagnostics(uri);
     }),
     vscode.commands.registerCommand("latexRich.syncToPdf", async (uri?: unknown) => {
       const document = await commandTexDocument(uri);

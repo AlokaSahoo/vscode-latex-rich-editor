@@ -347,14 +347,43 @@ math-field::part(virtual-keyboard-toggle) {
   }
 }
 
-/* Compile errors shown in the rich view (F8 / Shift+F8 to step through) */
+/* Compile errors and spelling/grammar findings (F8 / Shift+F8 to step through) */
 .cm-line.lr-error-line {
   background: var(--vscode-editorError-background, rgba(255, 0, 0, 0.06));
 }
-.lr-error-text {
-  text-decoration: wavy underline var(--vscode-editorError-foreground, #e51400);
+.lr-diag {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
   text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
 }
-.lr-error-hover {
+.lr-diag-error {
+  text-decoration-color: var(--vscode-editorError-foreground, #e51400);
+}
+.lr-diag-warning {
+  text-decoration-color: var(--vscode-editorWarning-foreground, #bf8803);
+}
+.lr-diag-info {
+  text-decoration-color: var(--vscode-editorInfo-foreground, #1a85ff);
+}
+.lr-diag-message-error {
   color: var(--vscode-errorForeground, #e51400);
+}
+.lr-diag-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.lr-diag-fixes button {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 3px;
+  background: var(--vscode-button-secondaryBackground, #e5e5e5);
+  color: var(--vscode-button-secondaryForeground, #1f1f1f);
+  font: inherit;
+  cursor: pointer;
+}
+.lr-diag-fixes button:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #d5d5d5);
 }
