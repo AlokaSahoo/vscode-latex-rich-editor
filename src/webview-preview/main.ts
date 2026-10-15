@@ -77,7 +77,11 @@ const PAGE_GAP = 12;
 let observer: IntersectionObserver | undefined;
 
 interface PageSlot {
+  /** The page's box: the canvas with a transparent, selectable text layer over it. */
+  wrapper: HTMLDivElement;
   canvas: HTMLCanvasElement;
+  textLayer: HTMLDivElement;
+  textBuilt: boolean;
   page: pdfjsLib.PDFPageProxy;
   viewport: pdfjsLib.PageViewport;
   state: "empty" | "queued" | "drawn";
@@ -118,7 +122,14 @@ async function renderPdf(url: string, workerUrl: string) {
     canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
     canvas.style.height = "auto";
     canvas.style.maxWidth = "none";
-    return { canvas, page, viewport, state: "empty" };
+    const wrapper = document.createElement("div");
+    wrapper.className = "pdf-slot";
+    wrapper.style.width = canvas.style.width;
+    const textLayer = document.createElement("div");
+    textLayer.className = "textLayer";
+    textLayer.style.setProperty("--scale-factor", String(viewport.scale));
+    wrapper.append(canvas, textLayer);
+    return { wrapper, canvas, textLayer, textBuilt: false, page, viewport, state: "empty" };
   });
 
   async function draw(slot: PageSlot) {
@@ -138,6 +149,20 @@ async function renderPdf(url: string, workerUrl: string) {
     canvas.height = scratch.height;
     canvas.getContext("2d")!.drawImage(scratch, 0, 0);
     slot.state = "drawn";
+    // Selectable text. Built once per page and kept when the bitmap is released
+    // (it's cheap), so a selection can span pages that have scrolled out of view.
+    if (!slot.textBuilt) {
+      slot.textBuilt = true;
+      new pdfjsLib.TextLayer({
+        textContentSource: page.streamTextContent(),
+        container: slot.textLayer,
+        viewport,
+      })
+        .render()
+        .catch(() => {
+          slot.textBuilt = false;
+        });
+    }
   }
 
   // One page at a time, nearest the viewport first as they get queued.
@@ -176,7 +201,7 @@ async function renderPdf(url: string, workerUrl: string) {
   }
 
   observer?.disconnect();
-  container.replaceChildren(...slots.map((slot) => slot.canvas));
+  container.replaceChildren(...slots.map((slot) => slot.wrapper));
   if (document.scrollingElement) document.scrollingElement.scrollTop = scrollTop;
 
   const bySlot = new Map(slots.map((slot) => [slot.canvas, slot]));
@@ -223,7 +248,7 @@ function captureAnchor(): { page: number; fraction: number } | undefined {
 // Double-click → source: convert the click to PDF points from the page's
 // top-left corner (the coordinate system SyncTeX uses).
 container.addEventListener("dblclick", (event) => {
-  const canvas = (event.target as HTMLElement).closest<HTMLCanvasElement>("canvas.pdf-page");
+  const canvas = (event.target as HTMLElement).closest(".pdf-slot")?.querySelector<HTMLCanvasElement>("canvas.pdf-page");
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
   const pointsPerPixel = Number(canvas.dataset.widthPt) / rect.width;

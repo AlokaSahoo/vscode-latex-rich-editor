@@ -107,7 +107,12 @@ export class PdfPreviewPanel {
   <style>
     html, body { min-height: 100%; margin: 0; padding: 0; background: #525659; }
     #pages { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px; color: #eee; width: max-content; min-width: calc(100% - 24px); box-sizing: content-box; }
-    #pages > canvas { margin-left: auto; margin-right: auto; }
+    #pages > .pdf-slot { margin-left: auto; margin-right: auto; position: relative; flex: none; }
+    .pdf-slot > canvas { display: block; }
+    /* Transparent text over the page so it can be selected and copied. */
+    .textLayer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 1; }
+    .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+    .textLayer ::selection { background: rgba(0, 110, 255, 0.35); }
     .pdf-page { height: auto; box-shadow: 0 1px 4px rgba(0,0,0,0.5); cursor: text; }
     body.dark-pages { background: #1e1e1e; }
     .sync-marker { position: absolute; background: rgba(255, 196, 0, 0.35); border-radius: 3px; pointer-events: none; animation: sync-fade 1.6s ease-out forwards; }

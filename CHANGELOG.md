@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- **Select and copy text in the PDF preview:** pages now have a transparent text layer, so you can drag-select, double-click a word and copy with Cmd/Ctrl+C. Double-click still jumps to the source line. A selection can span pages that have scrolled out of view once they have been shown.
+
 ## 0.2.2
 
 - **Text size:** zoom-out / zoom-in buttons in the rich view's toolbar (60%–250%), saved as the `latexRich.fontScale` setting so every open view and your other machines (with Settings Sync) follow.
