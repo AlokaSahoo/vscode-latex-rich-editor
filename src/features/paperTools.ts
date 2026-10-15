@@ -30,28 +30,46 @@ export function registerPaperTools(context: vscode.ExtensionContext, output: vsc
   const update = () => {
     clearTimeout(timer);
     timer = setTimeout(() => {
-      const document = activeTexDocument();
-      if (!document || document.uri.scheme !== "file") {
-        status.hide();
-        return;
+      try {
+        refreshStatus();
+      } catch (err) {
+        // Never leave the status bar silently empty: say why.
+        const message = err instanceof Error ? err.message : String(err);
+        output.appendLine(`Word count failed: ${message}`);
+        status.text = "$(book) word count unavailable";
+        status.tooltip = `The word count hit an error: ${message}. See Output → LaTeX Rich Editor.`;
+        status.backgroundColor = undefined;
+        status.show();
       }
-      // Count the whole paper, also when a chapter file is the one open.
-      const root = rootOf(document);
-      const rootText = root === document.uri.fsPath ? document.getText() : readFile(root);
-      if (rootText === undefined || !showsWordCount(rootText, document.uri)) {
-        status.hide();
-        return;
-      }
-      const report = countLength(root, root === document.uri.fsPath ? document.getText() : undefined, wordLimit(document.uri));
-      const estimated = report.figures.some((f) => f.estimated);
-      status.text = `$(book) ${estimated ? "~" : ""}${report.total.toLocaleString()} / ${report.limit.toLocaleString()} words`;
-      status.tooltip =
-        "APS length estimate: text + captions + equations + figures + tables. Title, authors, abstract, acknowledgments, references, appendices and end matter are not counted." +
-        (estimated ? " Some figure sizes are guessed because the image file couldn't be read." : "") +
-        " Click for the breakdown.";
-      status.backgroundColor = report.total > report.limit ? new vscode.ThemeColor("statusBarItem.errorBackground") : undefined;
-      status.show();
     }, 800);
+  };
+  // While the PDF preview has focus there is no active .tex tab; keep counting the paper it shows.
+  let lastDocument: vscode.TextDocument | undefined;
+  const refreshStatus = () => {
+    const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    let document = activeTexDocument();
+    if (document) lastDocument = document;
+    else if (tab?.input instanceof vscode.TabInputWebview && lastDocument && !lastDocument.isClosed) document = lastDocument;
+    if (!document || document.uri.scheme !== "file") {
+      status.hide();
+      return;
+    }
+    // Count the whole paper, also when a chapter file is the one open.
+    const root = rootOf(document);
+    const rootText = root === document.uri.fsPath ? document.getText() : readFile(root);
+    if (rootText === undefined || !showsWordCount(rootText, document.uri)) {
+      status.hide();
+      return;
+    }
+    const report = countLength(root, root === document.uri.fsPath ? document.getText() : undefined, wordLimit(document.uri));
+    const estimated = report.figures.some((f) => f.estimated);
+    status.text = `$(book) ${estimated ? "~" : ""}${report.total.toLocaleString()} / ${report.limit.toLocaleString()} words`;
+    status.tooltip =
+      "APS length estimate: text + captions + equations + figures + tables. Title, authors, abstract, acknowledgments, references, appendices and end matter are not counted." +
+      (estimated ? " Some figure sizes are guessed because the image file couldn't be read." : "") +
+      " Click for the breakdown.";
+    status.backgroundColor = report.total > report.limit ? new vscode.ThemeColor("statusBarItem.errorBackground") : undefined;
+    status.show();
   };
   context.subscriptions.push(
     vscode.window.tabGroups.onDidChangeTabs(update),

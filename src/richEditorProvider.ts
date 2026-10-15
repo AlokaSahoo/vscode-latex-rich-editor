@@ -1,3 +1,4 @@
+import { clampFontScale } from "./shared/layout";
 import * as vscode from "vscode";
 import * as path from "path";
 import { rootOf } from "./compile/compileManager";
@@ -71,6 +72,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
         type: "layout",
         pageWidth: config.get<number>("pageWidth", 880),
         pageAlign: config.get<PageAlign>("pageAlign", "center"),
+        fontScale: config.get<number>("fontScale", 1),
       });
     }
   }
@@ -224,6 +226,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
             customCommands: config.get<Record<string, CustomCommandStyle>>("customCommands", {}),
             pageWidth: config.get<number>("pageWidth", 880),
             pageAlign: config.get<PageAlign>("pageAlign", "center"),
+            fontScale: config.get<number>("fontScale", 1),
             showToolbar: config.get<boolean>("showToolbar", true),
             pdfWorkerUrl: webviewPanel.webview
               .asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "dist", "pdf.worker.min.mjs"))
@@ -288,7 +291,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
         case "setLayout":
-          await updateLayout(message.pageWidth, message.pageAlign);
+          await updateLayout(message.pageWidth, message.pageAlign, message.fontScale);
           break;
         case "cursor":
           RichEditorProvider.positions.set(key, message.position);
@@ -412,9 +415,10 @@ function getNonce(): string {
   return text;
 }
 
-/** Saves page width/alignment as user settings; the config listener then updates every open view. */
-export async function updateLayout(pageWidth?: number, pageAlign?: PageAlign) {
+/** Saves page width/alignment/text size as user settings; the config listener then updates every open view. */
+export async function updateLayout(pageWidth?: number, pageAlign?: PageAlign, fontScale?: number) {
   const config = vscode.workspace.getConfiguration("latexRich");
   if (pageWidth !== undefined) await config.update("pageWidth", Math.max(0, Math.round(pageWidth)), vscode.ConfigurationTarget.Global);
   if (pageAlign !== undefined) await config.update("pageAlign", pageAlign, vscode.ConfigurationTarget.Global);
+  if (fontScale !== undefined) await config.update("fontScale", clampFontScale(fontScale), vscode.ConfigurationTarget.Global);
 }

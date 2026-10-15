@@ -55,6 +55,7 @@ export type HostToWebviewMessage =
       customCommands: Record<string, CustomCommandStyle>;
       pageWidth: number;
       pageAlign: PageAlign;
+      fontScale: number;
       showToolbar: boolean;
       pdfWorkerUrl: string;
       references: ReferenceTable;
@@ -69,7 +70,7 @@ export type HostToWebviewMessage =
   | { type: "figuresAdded"; requestId: string; paths: string[]; error?: string }
   | { type: "revealLine"; line: number }
   | { type: "restoreView"; position: ViewPosition }
-  | { type: "layout"; pageWidth: number; pageAlign: PageAlign }
+  | { type: "layout"; pageWidth: number; pageAlign: PageAlign; fontScale: number }
   | { type: "fixes"; requestId: string; fixes: FixOption[] };
 
 export type WebviewToHostMessage =
@@ -78,7 +79,7 @@ export type WebviewToHostMessage =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "cursor"; position: ViewPosition }
-  | { type: "setLayout"; pageWidth?: number; pageAlign?: PageAlign }
+  | { type: "setLayout"; pageWidth?: number; pageAlign?: PageAlign; fontScale?: number }
   | { type: "goToDefinition"; kind: "label" | "cite" | "file"; key: string }
   | { type: "requestFixes"; requestId: string; from: number; to: number }
   | { type: "applyFix"; requestId: string; index: number }

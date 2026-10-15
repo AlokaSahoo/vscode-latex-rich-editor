@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#525659}#pages{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px}#pages{width:max-content;min-width:calc(100% - 24px);box-sizing:content-box}#pages>canvas{margin:0 auto}.pdf-page{height:auto;box-shadow:0 1px 4px #0008}#dark-toggle{position:fixed;top:10px;right:14px}</style></head>
+<body><div id="zoom-bar" style="position:fixed;top:10px;right:54px;z-index:10;background:#222;color:#eee"><button id="zoom-out">-</button><button id="zoom-level">100%</button><button id="fit-page">[]</button><button id="zoom-in">+</button></div><button id="dark-toggle"></button><div id="pages"></div>
+<script>
+window.sent = [];
+window.acquireVsCodeApi = () => ({ postMessage: (m) => window.sent.push(m), getState: () => ({}), setState: () => {} });
+const q = new URLSearchParams(location.search);
+const script = document.createElement("script");
+script.src = "../../dist/" + (q.get("old") ? "webview-preview-old.js" : "webview-preview.js");
+script.onload = () => { window.__t0 = performance.now(); window.postMessage({ type: "load", url: "../../" + (q.get("pdf") || "sample/revtex-sample.pdf"), workerUrl: "../../dist/pdf.worker.min.mjs" }, "*"); };
+document.body.appendChild(script);
+</script></body></html>

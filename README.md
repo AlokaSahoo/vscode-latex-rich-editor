@@ -21,7 +21,7 @@ Overleaf-style rich-text (WYSIWYM) editing for `.tex` files in VS Code, with com
 - **PRL length check** — counts the way the [APS length guide](https://journals.aps.org/authors/length-guide) does: text, captions and footnotes, plus 16 words per displayed-equation row (32 if two-column), 150/aspect + 20 per figure (300/(0.5·aspect) + 40 for `figure*`, aspect read from the image file), and 13 + 6.5/line per table. Title, authors, abstract, acknowledgments, references, appendices and end matter (everything from `\appendix`, the bibliography or an "End Matter"/"Supplemental Material" heading onward) are excluded. A `~` before the count means some figure sizes had to be guessed. Every REVTeX paper shows a live count in the status bar (bottom right; red when over the limit — click it for the breakdown), counting the whole paper even when you're editing an `\\input` chapter.
 - **New REVTeX Paper** — starts a PRL, PRB, PRX or single-column preprint with a starter `references.bib` and a `figures/` folder.
 - **Compile** with `latexmk`; errors appear as VS Code Problems at the offending line.
-- **PDF preview** beside the editor (moon button for dark pages), crisp on high-DPI screens, keeping its scroll position across recompiles. **Double-click the PDF** to jump to the matching source line — in the rich view or the raw editor, whichever you're using.
+- **PDF preview** beside the editor — opens only from the preview button (compiling just refreshes it if it's open; `latexRich.openPdfAfterCompile` changes that), with `−`/`+`/fit-page zoom and a moon button for dark pages, crisp on high-DPI screens, keeping its scroll position across recompiles. **Double-click the PDF** to jump to the matching source line — in the rich view or the raw editor, whichever you're using.
 - **Clean auxiliary files** in one click.
 
 ## Typing helpers (rich view)
@@ -142,6 +142,8 @@ Install a checker extension — [LTeX+](https://marketplace.visualstudio.com/ite
 | `latexRich.wordLimit` | `3750` | Limit the count is compared against (3750 for Letters, 750 for PRL Comments). |
 | `latexRich.showToolbar` | `true` | Show the formatting toolbar above the rich view. |
 | `latexRich.pageWidth` | `880` | Width (px) of the rich view's text column, which also stands in for `\textwidth` when sizing figures. `0` = full editor width. Easiest to change with the **− / + / full-width** buttons at the right end of the toolbar. |
+| `latexRich.fontScale` | `1` | Text size of the rich view as a multiple of the default (0.6–2.5). Change it with the zoom **−/+** buttons in the toolbar. |
+| `latexRich.openPdfAfterCompile` | `false` | Open the PDF preview automatically after a successful compile. Off by default: the preview opens only from the preview button, and an already-open preview always refreshes. |
 | `latexRich.pageAlign` | `center` | `center` or `left` — also a toolbar button. |
 
 Both apply the next time a file is opened in the rich view.

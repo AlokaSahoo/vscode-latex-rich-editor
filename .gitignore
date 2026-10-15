@@ -15,3 +15,4 @@ sample/*.out
 sample/*.synctex(busy)
 bench/*.tex
 bench/host.js
+bench/long.pdf

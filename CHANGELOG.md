@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2
+
+- **Text size:** zoom-out / zoom-in buttons in the rich view's toolbar (60%–250%), saved as the `latexRich.fontScale` setting so every open view and your other machines (with Settings Sync) follow.
+- **PDF zoom:** `−` / `+` / percentage / fit-page controls in the PDF preview, plus Ctrl/Cmd + `+`, `-`, `0` and Ctrl/Cmd + scroll. Zooming and recompiling keep your place on the page; zoom is remembered per panel.
+- **The PDF opens only when you ask:** compiling (button, command or save) no longer opens the preview; *Open PDF Preview* does. An already-open preview still refreshes in the background. Set `latexRich.openPdfAfterCompile` to get the old behavior back.
+- **Compile status:** a status bar item shows *compiling…*, *OK* (with warning count) or the number of errors; click it to open the PDF or the Problems panel.
+- Tests for the preview policy and text-size clamping; `test/harness/stress.tex` exercises macros, `align`, `multirow` tables and `\input`.
+
 ## 0.2.1
 
 - **Speed (large documents):** moving the cursor in the rich view no longer re-parses the whole file, symbol and reference layers are cached per document, and the tokenizer skips straight to the next LaTeX trigger. On a 7,800-line paper a cursor move went from ~120 ms to ~19 ms and a keystroke from ~120 ms to ~30 ms (2,000 lines: ~20 ms to ~7 ms).

@@ -8,6 +8,7 @@ import { registerActionsView } from "./features/actionsView";
 import { registerOutlineView } from "./features/outlineView";
 import { registerPaperTools } from "./features/paperTools";
 import { offerFix, registerSetup } from "./features/setup";
+import { previewAfterCompile, statusText, type CompileState } from "./compile/previewPolicy";
 import { PdfPreviewPanel } from "./preview/pdfPreviewPanel";
 import { forwardSearch, loadSynctex } from "./synctex";
 
@@ -39,14 +40,38 @@ export function activate(context: vscode.ExtensionContext) {
     else if (!quiet) vscode.window.showInformationMessage("Compile the document first — there's no SyncTeX data for this line yet.");
   };
 
+  // Compile status, since a finished compile no longer pops up the PDF.
+  const compileStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
+  compileStatus.name = "LaTeX compile status";
+  context.subscriptions.push(compileStatus);
+  const setStatus = (state: CompileState) => {
+    const view = statusText(state);
+    if (!view) return compileStatus.hide();
+    compileStatus.text = view.text;
+    compileStatus.tooltip = view.tooltip;
+    compileStatus.command = state.kind === "error" ? "workbench.actions.view.problems" : "latexRich.showPreview";
+    compileStatus.show();
+  };
+  const countDiagnostics = (severity: vscode.DiagnosticSeverity) => {
+    let n = 0;
+    diagnostics.forEach((_uri, items) => {
+      n += items.filter((d) => d.severity === severity).length;
+    });
+    return n;
+  };
+
   let compiling = false;
   let compileAgain = false;
-  const compileAndPreview = async (document: vscode.TextDocument, fromSave = false) => {
+  let openAfterQueued = false;
+  // The PDF opens only when asked for (`openPdf`); otherwise an already-open preview is just refreshed.
+  const compileAndPreview = async (document: vscode.TextDocument, fromSave = false, openPdf = false) => {
     if (compiling) {
       compileAgain = true;
+      openAfterQueued ||= openPdf;
       return;
     }
     compiling = true;
+    setStatus({ kind: "compiling" });
     try {
       // Save the whole project (a chapter may be compiled through its main file).
       for (const open of vscode.workspace.textDocuments) {
@@ -54,33 +79,48 @@ export function activate(context: vscode.ExtensionContext) {
       }
       const result = await compileDocument(document, outputChannel, diagnostics);
       if (result.success) {
-        // On save, refresh an open preview without pulling focus; otherwise open it.
-        if (!fromSave || PdfPreviewPanel.isOpen()) PdfPreviewPanel.show(context, result.pdfPath, fromSave);
-        if (vscode.workspace.getConfiguration("latexRich").get("syncAfterCompile", true)) {
+        setStatus({ kind: "ok", warnings: countDiagnostics(vscode.DiagnosticSeverity.Warning) });
+        const policy = previewAfterCompile({
+          requested: openPdf,
+          previewOpen: PdfPreviewPanel.isOpen(),
+          autoOpen: vscode.workspace.getConfiguration("latexRich").get("openPdfAfterCompile", false),
+        });
+        if (policy.show) PdfPreviewPanel.show(context, result.pdfPath, policy.quiet);
+        if (policy.show && vscode.workspace.getConfiguration("latexRich").get("syncAfterCompile", true)) {
           setTimeout(() => syncToCursor(document, result.pdfPath, true), 600);
         }
       } else if (result.problem) {
+        setStatus({ kind: "error", errors: 0 });
         await offerFix(result.problem);
-      } else if (!fromSave) {
+      } else {
+        setStatus({ kind: "error", errors: countDiagnostics(vscode.DiagnosticSeverity.Error) });
+      }
+      if (!result.success && !result.problem && !fromSave) {
         const choice = await vscode.window.showErrorMessage(
           "LaTeX compile failed — the errors are listed in the Problems panel and underlined in the editor.",
           "Show Log",
         );
         if (choice) outputChannel.show(true);
       }
+    } catch (err) {
+      setStatus({ kind: "error", errors: 0 });
+      throw err;
     } finally {
       compiling = false;
     }
     if (compileAgain) {
       compileAgain = false;
-      await compileAndPreview(document, fromSave);
+      const open = openPdf || openAfterQueued;
+      openAfterQueued = false;
+      await compileAndPreview(document, fromSave, open);
     }
   };
 
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((saved) => {
-      if (compiling || !/\.(tex|bib)$/i.test(saved.uri.path)) return;
-      if (!vscode.workspace.getConfiguration("latexRich", saved.uri).get("compileOnSave", false)) return;
+      // A save during a running compile still counts: compileAndPreview queues one more run.
+      if (!/\.(tex|bib)$/i.test(saved.uri.path)) return;
+      if (!vscode.workspace.getConfiguration("latexRich", saved.uri).get("compileOnSave", true)) return;
       const target = /\.tex$/i.test(saved.uri.path) ? saved : activeTexDocument();
       if (target) void compileAndPreview(target, true);
     }),
@@ -89,7 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
       for (const uri of e.uris) RichEditorProvider.refreshDiagnostics(uri);
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("latexRich.pageWidth") || e.affectsConfiguration("latexRich.pageAlign")) {
+      if (e.affectsConfiguration("latexRich.pageWidth") || e.affectsConfiguration("latexRich.pageAlign") || e.affectsConfiguration("latexRich.fontScale")) {
         RichEditorProvider.broadcastLayout();
       }
     }),
@@ -126,7 +166,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (!document) return;
       const pdfPath = pdfOf(document);
       if (fs.existsSync(pdfPath)) PdfPreviewPanel.show(context, pdfPath);
-      else await compileAndPreview(document);
+      else await compileAndPreview(document, false, true);
     }),
 
     vscode.commands.registerCommand("latexRich.openRich", (uri?: unknown) =>

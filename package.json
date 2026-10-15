@@ -2,7 +2,7 @@
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
   "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
   "icon": "images/icon.png",
@@ -190,6 +190,18 @@
           "minimum": 0,
           "markdownDescription": "Width in pixels of the rich view's text column (`0` = full editor width). It also stands in for the paper's `\\textwidth` when sizing figures. Change it with the width buttons at the right end of the toolbar."
         },
+        "latexRich.fontScale": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0.6,
+          "maximum": 2.5,
+          "markdownDescription": "Text size of the rich view as a multiple of the default (`1.2` = 120%). Change it with the zoom buttons in the toolbar."
+        },
+        "latexRich.openPdfAfterCompile": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Open the PDF preview automatically after a successful compile. Off by default: the preview opens only from the *Open PDF Preview* button (an already-open preview always refreshes)."
+        },
         "latexRich.showToolbar": {
           "type": "boolean",
           "default": true,
@@ -197,8 +209,8 @@
         },
         "latexRich.compileOnSave": {
           "type": "boolean",
-          "default": false,
-          "markdownDescription": "Compile automatically every time a `.tex` or `.bib` file is saved, refreshing the PDF preview if it's open."
+          "default": true,
+          "markdownDescription": "Compile automatically every time a `.tex` or `.bib` file is saved (⌘S / Ctrl+S), refreshing the PDF preview if it's open. Turn off if another LaTeX extension already builds on save."
         },
         "latexRich.engine": {
           "type": "string",

@@ -24,6 +24,7 @@ import "codemirror-visual-markup/dist/styles.css";
 // webviews and left \mathcal, \mathbb, \mathfrak… as plain letters.
 import "mathlive/fonts.css";
 import "./editor.css";
+import { clampFontScale } from "../shared/layout";
 import { applyLayout, modernizeToolbar, setLayoutSender } from "./toolbar";
 import { followThemeChanges, isDarkTheme, themeExtension } from "./theme";
 import {
@@ -170,11 +171,11 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
     (requestId, from, to) => post({ type: "requestFixes", requestId, from, to }),
     (requestId, index) => post({ type: "applyFix", requestId, index }),
   );
-  applyLayout(message.pageWidth, message.pageAlign);
+  applyLayout(message.pageWidth, message.pageAlign, message.fontScale);
   // Apply immediately, then save as settings (which updates other open views).
   setLayoutSender((change) => {
-    message = { ...message, ...change };
-    applyLayout(message.pageWidth, message.pageAlign);
+    message = { ...message, ...change, fontScale: clampFontScale(change.fontScale ?? message.fontScale) };
+    applyLayout(message.pageWidth, message.pageAlign, message.fontScale);
     post({ type: "setLayout", ...change });
   });
 
@@ -253,7 +254,7 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
       applyRemoteChanges(message.changes);
       break;
     case "layout":
-      applyLayout(message.pageWidth, message.pageAlign);
+      applyLayout(message.pageWidth, message.pageAlign, message.fontScale);
       break;
     case "fixes":
       resolveFixes(message.requestId, message.fixes);

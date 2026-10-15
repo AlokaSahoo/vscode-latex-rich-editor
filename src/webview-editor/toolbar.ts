@@ -73,13 +73,14 @@ function styleColorInput(input: HTMLInputElement) {
 
 // --- Page width / alignment controls (right end of the toolbar) ---------------
 
-let layout = { pageWidth: 880, pageAlign: "center" as PageAlign };
-let sendLayout: (change: { pageWidth?: number; pageAlign?: PageAlign }) => void = () => {};
+let layout = { pageWidth: 880, pageAlign: "center" as PageAlign, fontScale: 1 };
+let sendLayout: (change: { pageWidth?: number; pageAlign?: PageAlign; fontScale?: number }) => void = () => {};
 
 /** Applies width/alignment to the page and remembers it for the buttons. */
-export function applyLayout(pageWidth: number, pageAlign: PageAlign) {
-  layout = { pageWidth, pageAlign };
+export function applyLayout(pageWidth: number, pageAlign: PageAlign, fontScale = 1) {
+  layout = { pageWidth, pageAlign, fontScale };
   const root = document.documentElement;
+  root.style.setProperty("--lr-font-scale", String(fontScale));
   if (pageWidth > 0) root.style.setProperty("--lr-page-width", `${pageWidth}px`);
   else root.style.removeProperty("--lr-page-width");
   root.classList.toggle("lr-align-left", pageAlign === "left");
@@ -91,6 +92,8 @@ export function setLayoutSender(send: typeof sendLayout) {
 }
 
 const LAYOUT_BUTTONS: Array<{ key: string; run: () => void }> = [
+  { key: "textSmaller", run: () => sendLayout({ fontScale: layout.fontScale - 0.1 }) },
+  { key: "textLarger", run: () => sendLayout({ fontScale: layout.fontScale + 0.1 }) },
   { key: "align", run: () => sendLayout({ pageAlign: layout.pageAlign === "left" ? "center" : "left" }) },
   { key: "narrower", run: () => sendLayout({ pageWidth: Math.max(480, (layout.pageWidth || window.innerWidth) - 80) }) },
   { key: "wider", run: () => sendLayout({ pageWidth: Math.max(480, (layout.pageWidth || window.innerWidth) + 80) }) },
@@ -100,6 +103,14 @@ const LAYOUT_BUTTONS: Array<{ key: string; run: () => void }> = [
 function updateLayoutButton(button: HTMLElement) {
   const icon = button.firstElementChild as HTMLElement;
   switch (button.dataset.layout) {
+    case "textSmaller":
+      icon.className = "codicon codicon-zoom-out";
+      button.title = `Smaller text (${Math.round(layout.fontScale * 100)}%)`;
+      break;
+    case "textLarger":
+      icon.className = "codicon codicon-zoom-in";
+      button.title = `Larger text (${Math.round(layout.fontScale * 100)}%)`;
+      break;
     case "align":
       icon.className = "codicon codicon-layout-sidebar-left";
       button.title = layout.pageAlign === "left" ? "Center the page" : "Align the page to the left";

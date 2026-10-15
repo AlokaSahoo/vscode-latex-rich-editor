@@ -106,8 +106,9 @@ export class PdfPreviewPanel {
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp} data: blob:; script-src 'nonce-${nonce}' ${csp}; worker-src ${csp} blob:; connect-src ${csp}; style-src 'unsafe-inline';" />
   <style>
     html, body { min-height: 100%; margin: 0; padding: 0; background: #525659; }
-    #pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; color: #eee; }
-    .pdf-page { max-width: 100%; height: auto; box-shadow: 0 1px 4px rgba(0,0,0,0.5); cursor: text; }
+    #pages { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px; color: #eee; width: max-content; min-width: calc(100% - 24px); box-sizing: content-box; }
+    #pages > canvas { margin-left: auto; margin-right: auto; }
+    .pdf-page { height: auto; box-shadow: 0 1px 4px rgba(0,0,0,0.5); cursor: text; }
     body.dark-pages { background: #1e1e1e; }
     .sync-marker { position: absolute; background: rgba(255, 196, 0, 0.35); border-radius: 3px; pointer-events: none; animation: sync-fade 1.6s ease-out forwards; }
     @keyframes sync-fade { 0%, 40% { opacity: 1; } 100% { opacity: 0; } }
@@ -119,10 +120,26 @@ export class PdfPreviewPanel {
       box-shadow: 0 1px 4px rgba(0,0,0,0.4); opacity: 0.75;
     }
     #dark-toggle:hover { opacity: 1; }
+    #zoom-bar {
+      position: fixed; top: 10px; right: 54px; z-index: 10; display: flex; align-items: center; gap: 2px;
+      height: 30px; border-radius: 15px; padding: 0 4px; background: rgba(30,30,30,0.7); color: #eee;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4); opacity: 0.75; font: 12px sans-serif;
+    }
+    #zoom-bar:hover { opacity: 1; }
+    #zoom-bar button { border: none; background: none; color: inherit; cursor: pointer; font-size: 16px; width: 26px; height: 26px; border-radius: 13px; }
+    #zoom-bar button.on { background: rgba(255,255,255,0.25); }
+    #zoom-bar button:hover { background: rgba(255,255,255,0.15); }
+    #zoom-level { min-width: 40px; text-align: center; font-size: 12px !important; width: auto !important; }
     body.dark-pages #dark-toggle { background: rgba(240,240,240,0.85); color: #222; }
   </style>
 </head>
 <body>
+  <div id="zoom-bar">
+    <button id="zoom-out" title="Zoom out (Ctrl/Cmd -)" aria-label="Zoom out">&minus;</button>
+    <button id="zoom-level" title="Reset to fit width (Ctrl/Cmd 0)" aria-label="Reset zoom">100%</button>
+    <button id="fit-page" title="Fit whole page" aria-label="Fit whole page">&#9633;</button>
+    <button id="zoom-in" title="Zoom in (Ctrl/Cmd +)" aria-label="Zoom in">+</button>
+  </div>
   <button id="dark-toggle" aria-label="Toggle dark pages">&#9790;</button>
   <div id="pages"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>

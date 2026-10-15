@@ -231,6 +231,9 @@ body {
   max-width: var(--lr-page-width, none);
   margin: 0 auto;
 }
+.lv-editor-host .cm-editor {
+  font-size: calc(100% * var(--lr-font-scale, 1)) !important;
+}
 .lr-align-left .lv-editor-host .cm-editor {
   margin-left: 0;
 }

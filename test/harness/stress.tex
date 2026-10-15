@@ -1,0 +1,31 @@
+\documentclass[aps,prl,twocolumn]{revtex4-2}
+\usepackage{multirow,booktabs,amsmath,siunitx}
+\newcommand{\ham}{\mathcal{H}}
+\newcommand{\avg}[1]{\langle #1 \rangle}
+\begin{document}
+\title{Stress test}
+\author{A. Author}
+\begin{abstract}
+We study $\ham$ with \avg{x} and \SI{3}{\meter}.
+\end{abstract}
+\maketitle
+\section{Intro}\label{sec:intro}
+Text with \textbf{bold}, \emph{emph}, \textsc{small caps}, \footnote{A note.} and \cite{key1,key2}, see Sec.~\ref{sec:intro}.
+\begin{align}
+a &= b + c \label{eq:a}\\
+d &= e
+\end{align}
+\begin{table}
+\begin{tabular}{|l|c|}
+\hline
+\multirow{2}{*}{Name} & Value \\
+ & 1 \\
+\hline
+\end{tabular}
+\caption{A table}
+\end{table}
+\begin{enumerate}
+\item First \item Second
+\end{enumerate}
+\input{chapter}
+\end{document}
