@@ -1,7 +1,7 @@
 import type { Extension } from "@codemirror/state";
 import { DualVisualEditor } from "codemirror-visual-markup";
 import "@vscode/codicons/dist/codicon.css";
-import type { PageAlign } from "./protocol";
+import type { LayoutSettings, PageAlign } from "./protocol";
 
 // The renderer's mode bar (Source / Visual / Show source / Math hover) is
 // replaced by the extension's own raw ↔ rich toggle, so its shortcuts go too
@@ -73,12 +73,13 @@ function styleColorInput(input: HTMLInputElement) {
 
 // --- Page width / alignment controls (right end of the toolbar) ---------------
 
-let layout = { pageWidth: 880, pageAlign: "center" as PageAlign, fontScale: 1 };
-let sendLayout: (change: { pageWidth?: number; pageAlign?: PageAlign; fontScale?: number }) => void = () => {};
+let layout: LayoutSettings = { pageWidth: 880, pageAlign: "center", fontScale: 1, viewMode: "lines", showComments: true };
+let sendLayout: (change: Partial<LayoutSettings>) => void = () => {};
 
 /** Applies width/alignment to the page and remembers it for the buttons. */
-export function applyLayout(pageWidth: number, pageAlign: PageAlign, fontScale = 1) {
-  layout = { pageWidth, pageAlign, fontScale };
+export function applyLayout(settings: LayoutSettings) {
+  layout = { ...settings };
+  const { pageWidth, pageAlign, fontScale } = settings;
   const root = document.documentElement;
   root.style.setProperty("--lr-font-scale", String(fontScale));
   if (pageWidth > 0) root.style.setProperty("--lr-page-width", `${pageWidth}px`);
@@ -92,6 +93,8 @@ export function setLayoutSender(send: typeof sendLayout) {
 }
 
 const LAYOUT_BUTTONS: Array<{ key: string; run: () => void }> = [
+  { key: "paragraphs", run: () => sendLayout({ viewMode: layout.viewMode === "paragraphs" ? "lines" : "paragraphs" }) },
+  { key: "comments", run: () => sendLayout({ showComments: !layout.showComments }) },
   { key: "textSmaller", run: () => sendLayout({ fontScale: layout.fontScale - 0.1 }) },
   { key: "textLarger", run: () => sendLayout({ fontScale: layout.fontScale + 0.1 }) },
   { key: "align", run: () => sendLayout({ pageAlign: layout.pageAlign === "left" ? "center" : "left" }) },
@@ -103,6 +106,19 @@ const LAYOUT_BUTTONS: Array<{ key: string; run: () => void }> = [
 function updateLayoutButton(button: HTMLElement) {
   const icon = button.firstElementChild as HTMLElement;
   switch (button.dataset.layout) {
+    case "paragraphs":
+      icon.className = `codicon codicon-${layout.viewMode === "paragraphs" ? "list-flat" : "list-ordered"}`;
+      button.title =
+        layout.viewMode === "paragraphs"
+          ? "Paragraph view (like the PDF) — click for line view with line numbers"
+          : "Line view — click for paragraph view, where lines flow together like the PDF";
+      button.classList.toggle("lr-tb-on", layout.viewMode === "paragraphs");
+      break;
+    case "comments":
+      icon.className = `codicon codicon-${layout.showComments ? "comment" : "comment-discussion"}`;
+      button.title = layout.showComments ? "Hide % comments" : "Show % comments";
+      button.classList.toggle("lr-tb-on", !layout.showComments);
+      break;
     case "textSmaller":
       icon.className = "codicon codicon-zoom-out";
       button.title = `Smaller text (${Math.round(layout.fontScale * 100)}%)`;

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- **Paragraph view:** a toolbar button (and *Rich View: Toggle Paragraph View*, `latexRich.viewMode`) flows consecutive source lines together into one paragraph until a blank line, the way the compiled PDF reads, and collapses runs of blank lines. Line numbers are hidden in this view; the file itself is never changed. Math, tables, verbatim text, `\begin`/`\section`-style lines and lines ending in `\\` are never joined, and an `\item` continues onto its following lines. In this view, Enter on a line of text starts a new paragraph.
+- **Comment visibility:** a toolbar button (and *Rich View: Toggle Comments*, `latexRich.showComments`) hides `%` comment lines and trailing comments; text on either side of a hidden comment line joins as LaTeX would.
+
 ## 0.2.3
 
 - **Select and copy text in the PDF preview:** pages now have a transparent text layer, so you can drag-select, double-click a word and copy with Cmd/Ctrl+C. Double-click still jumps to the source line. A selection can span pages that have scrolled out of view once they have been shown.

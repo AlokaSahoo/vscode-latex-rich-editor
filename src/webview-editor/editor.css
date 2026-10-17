@@ -423,3 +423,8 @@ math-field::part(virtual-keyboard-toggle) {
 .cm-lv-math-display math-field {
   pointer-events: none;
 }
+
+/* Paragraph view reads like the page, so source line numbers and fold markers go. */
+html.lr-paragraphs .lv-dual-editor .cm-gutters {
+  display: none !important;
+}

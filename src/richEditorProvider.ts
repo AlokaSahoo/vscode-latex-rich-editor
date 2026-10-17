@@ -11,9 +11,11 @@ import type {
   HostToWebviewMessage,
   ImageKind,
   EditorDiagnostic,
+  LayoutSettings,
   PageAlign,
   ProjectData,
   TextChange,
+  ViewMode,
   ViewPosition,
   WebviewToHostMessage,
 } from "./webview-editor/protocol";
@@ -70,9 +72,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
       const config = vscode.workspace.getConfiguration("latexRich", open.document.uri);
       open.post({
         type: "layout",
-        pageWidth: config.get<number>("pageWidth", 880),
-        pageAlign: config.get<PageAlign>("pageAlign", "center"),
-        fontScale: config.get<number>("fontScale", 1),
+        ...layoutSettings(config),
       });
     }
   }
@@ -224,9 +224,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
             type: "init",
             text: webviewText,
             customCommands: config.get<Record<string, CustomCommandStyle>>("customCommands", {}),
-            pageWidth: config.get<number>("pageWidth", 880),
-            pageAlign: config.get<PageAlign>("pageAlign", "center"),
-            fontScale: config.get<number>("fontScale", 1),
+            ...layoutSettings(config),
             showToolbar: config.get<boolean>("showToolbar", true),
             pdfWorkerUrl: webviewPanel.webview
               .asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "dist", "pdf.worker.min.mjs"))
@@ -291,7 +289,7 @@ export class RichEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
         case "setLayout":
-          await updateLayout(message.pageWidth, message.pageAlign, message.fontScale);
+          await updateLayout(message);
           break;
         case "cursor":
           RichEditorProvider.positions.set(key, message.position);
@@ -415,10 +413,23 @@ function getNonce(): string {
   return text;
 }
 
-/** Saves page width/alignment/text size as user settings; the config listener then updates every open view. */
-export async function updateLayout(pageWidth?: number, pageAlign?: PageAlign, fontScale?: number) {
+export function layoutSettings(config: vscode.WorkspaceConfiguration): LayoutSettings {
+  return {
+    pageWidth: config.get<number>("pageWidth", 880),
+    pageAlign: config.get<PageAlign>("pageAlign", "center"),
+    fontScale: config.get<number>("fontScale", 1),
+    viewMode: config.get<ViewMode>("viewMode", "lines"),
+    showComments: config.get<boolean>("showComments", true),
+  };
+}
+
+/** Saves layout choices as user settings; the config listener then updates every open view. */
+export async function updateLayout(change: Partial<LayoutSettings>) {
   const config = vscode.workspace.getConfiguration("latexRich");
-  if (pageWidth !== undefined) await config.update("pageWidth", Math.max(0, Math.round(pageWidth)), vscode.ConfigurationTarget.Global);
-  if (pageAlign !== undefined) await config.update("pageAlign", pageAlign, vscode.ConfigurationTarget.Global);
-  if (fontScale !== undefined) await config.update("fontScale", clampFontScale(fontScale), vscode.ConfigurationTarget.Global);
+  const save = (key: string, value: unknown) => config.update(key, value, vscode.ConfigurationTarget.Global);
+  if (change.pageWidth !== undefined) await save("pageWidth", Math.max(0, Math.round(change.pageWidth)));
+  if (change.pageAlign !== undefined) await save("pageAlign", change.pageAlign);
+  if (change.fontScale !== undefined) await save("fontScale", clampFontScale(change.fontScale));
+  if (change.viewMode !== undefined) await save("viewMode", change.viewMode);
+  if (change.showComments !== undefined) await save("showComments", change.showComments);
 }

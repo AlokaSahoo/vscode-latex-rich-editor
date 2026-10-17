@@ -25,6 +25,7 @@ import "codemirror-visual-markup/dist/styles.css";
 import "mathlive/fonts.css";
 import "./editor.css";
 import { clampFontScale } from "../shared/layout";
+import { setSourceMode, setViewOptions, viewModeExtension } from "./paragraphView";
 import { applyLayout, modernizeToolbar, setLayoutSender } from "./toolbar";
 import { followThemeChanges, isDarkTheme, themeExtension } from "./theme";
 import {
@@ -39,7 +40,7 @@ import {
 } from "./latexEnhancements";
 import { editingHelpers, setDefinitionHandler } from "./editingHelpers";
 import { errorExtensions, resolveFixes, setFixChannel, showErrors } from "./errors";
-import type { HostToWebviewMessage, ImageKind, TextChange, ViewPosition, WebviewToHostMessage } from "./protocol";
+import type { HostToWebviewMessage, ImageKind, LayoutSettings, TextChange, ViewPosition, WebviewToHostMessage } from "./protocol";
 import { resolveFigures, setFigureUploader, setImageLoader, setProjectData, smartExtensions } from "./smartFeatures";
 
 declare function acquireVsCodeApi(): {
@@ -171,11 +172,14 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
     (requestId, from, to) => post({ type: "requestFixes", requestId, from, to }),
     (requestId, index) => post({ type: "applyFix", requestId, index }),
   );
-  applyLayout(message.pageWidth, message.pageAlign, message.fontScale);
+  const showLayout = (settings: LayoutSettings) => {
+    applyLayout(settings);
+    setViewOptions(view, { paragraphs: settings.viewMode === "paragraphs", showComments: settings.showComments });
+  };
   // Apply immediately, then save as settings (which updates other open views).
   setLayoutSender((change) => {
     message = { ...message, ...change, fontScale: clampFontScale(change.fontScale ?? message.fontScale) };
-    applyLayout(message.pageWidth, message.pageAlign, message.fontScale);
+    showLayout(message);
     post({ type: "setLayout", ...change });
   });
 
@@ -187,6 +191,7 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
       updateListener,
       imageResolver.of(resolver),
       EditorView.lineWrapping,
+      viewModeExtension(),
       ...enhancementExtensions(),
       ...smartExtensions(),
       themeExtension(),
@@ -195,6 +200,7 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
     ],
   });
   view = new EditorView({ state });
+  showLayout(message);
   // The test harness sets this to drive and time the editor.
   if ((window as { __LR_DEBUG?: boolean }).__LR_DEBUG) (window as { __lrView?: EditorView }).__lrView = view;
   // Keep the host's idea of the scroll position current for view switches.
@@ -208,6 +214,7 @@ function createEditor(message: Extract<HostToWebviewMessage, { type: "init" }>) 
     onModeChange: (mode) => {
       container.classList.toggle("lr-source-mode", mode === "source");
       setVisualMode(view, mode === "visual");
+      setSourceMode(view, mode === "visual");
     },
   });
   // Clicking a display equation edits its LaTeX (the \begin{equation} source)
@@ -254,7 +261,8 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
       applyRemoteChanges(message.changes);
       break;
     case "layout":
-      applyLayout(message.pageWidth, message.pageAlign, message.fontScale);
+      applyLayout(message);
+      setViewOptions(view, { paragraphs: message.viewMode === "paragraphs", showComments: message.showComments });
       break;
     case "fixes":
       resolveFixes(message.requestId, message.fixes);

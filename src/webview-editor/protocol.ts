@@ -37,6 +37,16 @@ export interface ViewPosition {
 }
 
 export type PageAlign = "center" | "left";
+/** "lines": every source line is a line; "paragraphs": lines flow together until a blank line, as when compiled. */
+export type ViewMode = "lines" | "paragraphs";
+
+export interface LayoutSettings {
+  pageWidth: number;
+  pageAlign: PageAlign;
+  fontScale: number;
+  viewMode: ViewMode;
+  showComments: boolean;
+}
 
 export interface FixOption {
   index: number;
@@ -56,6 +66,8 @@ export type HostToWebviewMessage =
       pageWidth: number;
       pageAlign: PageAlign;
       fontScale: number;
+      viewMode: ViewMode;
+      showComments: boolean;
       showToolbar: boolean;
       pdfWorkerUrl: string;
       references: ReferenceTable;
@@ -70,7 +82,7 @@ export type HostToWebviewMessage =
   | { type: "figuresAdded"; requestId: string; paths: string[]; error?: string }
   | { type: "revealLine"; line: number }
   | { type: "restoreView"; position: ViewPosition }
-  | { type: "layout"; pageWidth: number; pageAlign: PageAlign; fontScale: number }
+  | ({ type: "layout" } & LayoutSettings)
   | { type: "fixes"; requestId: string; fixes: FixOption[] };
 
 export type WebviewToHostMessage =
@@ -79,7 +91,7 @@ export type WebviewToHostMessage =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "cursor"; position: ViewPosition }
-  | { type: "setLayout"; pageWidth?: number; pageAlign?: PageAlign; fontScale?: number }
+  | ({ type: "setLayout" } & Partial<LayoutSettings>)
   | { type: "goToDefinition"; kind: "label" | "cite" | "file"; key: string }
   | { type: "requestFixes"; requestId: string; from: number; to: number }
   | { type: "applyFix"; requestId: string; index: number }

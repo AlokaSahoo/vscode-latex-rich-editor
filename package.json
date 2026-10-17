@@ -2,7 +2,7 @@
   "name": "latex-rich-editor",
   "displayName": "LaTeX Rich Editor",
   "description": "Overleaf-style rich-text (WYSIWYM) editing for LaTeX, with compile, PDF preview and SyncTeX.",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "license": "AGPL-3.0-or-later",
   "publisher": "alokasahoo",
   "icon": "images/icon.png",
@@ -108,6 +108,16 @@
         "title": "Go to Line"
       },
       {
+        "command": "latexRich.toggleParagraphView",
+        "category": "LaTeX",
+        "title": "Rich View: Toggle Paragraph View"
+      },
+      {
+        "command": "latexRich.toggleComments",
+        "category": "LaTeX",
+        "title": "Rich View: Toggle Comments"
+      },
+      {
         "command": "latexRich.pageWider",
         "category": "LaTeX",
         "title": "Rich View: Wider Page"
@@ -189,6 +199,20 @@
           "default": 880,
           "minimum": 0,
           "markdownDescription": "Width in pixels of the rich view's text column (`0` = full editor width). It also stands in for the paper's `\\textwidth` when sizing figures. Change it with the width buttons at the right end of the toolbar."
+        },
+        "latexRich.viewMode": {
+          "type": "string",
+          "enum": [
+            "lines",
+            "paragraphs"
+          ],
+          "default": "lines",
+          "markdownDescription": "How the rich view lays out text. `lines`: every source line is its own line, with line numbers. `paragraphs`: consecutive lines flow together into one paragraph until a blank line, like the compiled PDF (extra blank lines collapse, line numbers are hidden). The file itself never changes. Toggle with the paragraph button in the toolbar."
+        },
+        "latexRich.showComments": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show `%` comments in the rich view. When off, comment lines and trailing comments are hidden (they stay in the file). Toggle with the comment button in the toolbar."
         },
         "latexRich.fontScale": {
           "type": "number",

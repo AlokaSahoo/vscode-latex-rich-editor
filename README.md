@@ -143,6 +143,8 @@ Install a checker extension — [LTeX+](https://marketplace.visualstudio.com/ite
 | `latexRich.showToolbar` | `true` | Show the formatting toolbar above the rich view. |
 | `latexRich.pageWidth` | `880` | Width (px) of the rich view's text column, which also stands in for `\textwidth` when sizing figures. `0` = full editor width. Easiest to change with the **− / + / full-width** buttons at the right end of the toolbar. |
 | `latexRich.fontScale` | `1` | Text size of the rich view as a multiple of the default (0.6–2.5). Change it with the zoom **−/+** buttons in the toolbar. |
+| `latexRich.viewMode` | `lines` | `lines`: each source line is its own line, with line numbers. `paragraphs`: lines flow together until a blank line, like the compiled PDF. Toggle with the paragraph button in the toolbar. |
+| `latexRich.showComments` | `true` | Show `%` comments in the rich view. Turn off to hide comment lines and trailing comments (they stay in the file). |
 | `latexRich.openPdfAfterCompile` | `false` | Open the PDF preview automatically after a successful compile. Off by default: the preview opens only from the preview button, and an already-open preview always refreshes. |
 | `latexRich.pageAlign` | `center` | `center` or `left` — also a toolbar button. |
 

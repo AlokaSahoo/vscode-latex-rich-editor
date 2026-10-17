@@ -129,21 +129,32 @@ export function activate(context: vscode.ExtensionContext) {
       for (const uri of e.uris) RichEditorProvider.refreshDiagnostics(uri);
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("latexRich.pageWidth") || e.affectsConfiguration("latexRich.pageAlign") || e.affectsConfiguration("latexRich.fontScale")) {
+      if (e.affectsConfiguration("latexRich.pageWidth") || e.affectsConfiguration("latexRich.pageAlign") || e.affectsConfiguration("latexRich.fontScale") ||
+        e.affectsConfiguration("latexRich.viewMode") ||
+        e.affectsConfiguration("latexRich.showComments")
+      ) {
         RichEditorProvider.broadcastLayout();
       }
     }),
     // Page width/alignment of the rich view; the toolbar has buttons for these too.
     ...(() => {
       const width = () => vscode.workspace.getConfiguration("latexRich").get<number>("pageWidth", 880);
-      const step = (delta: number) => () => updateLayout(Math.max(480, (width() || 1200) + delta));
+      const step = (delta: number) => () => updateLayout({ pageWidth: Math.max(480, (width() || 1200) + delta) });
       return [
         vscode.commands.registerCommand("latexRich.pageWider", step(80)),
         vscode.commands.registerCommand("latexRich.pageNarrower", step(-80)),
-        vscode.commands.registerCommand("latexRich.pageFullWidth", () => updateLayout(width() === 0 ? 880 : 0)),
+        vscode.commands.registerCommand("latexRich.pageFullWidth", () => updateLayout({ pageWidth: width() === 0 ? 880 : 0 })),
+        vscode.commands.registerCommand("latexRich.toggleParagraphView", () => {
+          const mode = vscode.workspace.getConfiguration("latexRich").get<string>("viewMode", "lines");
+          return updateLayout({ viewMode: mode === "paragraphs" ? "lines" : "paragraphs" });
+        }),
+        vscode.commands.registerCommand("latexRich.toggleComments", () => {
+          const shown = vscode.workspace.getConfiguration("latexRich").get<boolean>("showComments", true);
+          return updateLayout({ showComments: !shown });
+        }),
         vscode.commands.registerCommand("latexRich.pageAlign", () => {
           const align = vscode.workspace.getConfiguration("latexRich").get<string>("pageAlign", "center");
-          return updateLayout(undefined, align === "left" ? "center" : "left");
+          return updateLayout({ pageAlign: align === "left" ? "center" : "left" });
         }),
       ];
     })(),
